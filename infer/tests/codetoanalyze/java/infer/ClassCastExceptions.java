@@ -1,11 +1,11 @@
 /*
-* Copyright (c) 2013 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2013 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 package codetoanalyze.java.infer;
 
@@ -22,6 +22,10 @@ class SubClassA extends SuperClass {
 class SubClassB extends SuperClass {
 }
 
+interface MyInterface {
+  public int getInt();
+}
+
 class ImplementationOfInterface implements MyInterface {
 
   public int getInt() {
@@ -33,10 +37,6 @@ class AnotherImplementationOfInterface implements MyInterface {
   public int getInt() {
     return 1;
   }
-}
-
-interface MyInterface {
-  public int getInt();
 }
 
 
@@ -64,6 +64,10 @@ public class ClassCastExceptions {
     URL url = new URL(getURL());
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
     connection.disconnect();
+  }
+
+  public void castingArrayOfPrimitiveTypeOK(int[] a) {
+    int[] b = (int[]) a;
   }
 
 }

@@ -7,6 +7,8 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 (** Contains current class and current method to be translated as well as local variables, *)
 (** and the cg, cfg, and tenv corresponding to the current file. *)
 
@@ -15,23 +17,31 @@ type curr_class =
   (*class name and name of (optional) super class , and a list of protocols *)
   | ContextCategory of string * string (* category name and corresponding class *)
   | ContextProtocol of string  (* category name and corresponding class *)
+  | ContextClsDeclPtr of int
   | ContextNoCls
+[@@deriving compare]
+
+val equal_curr_class : curr_class -> curr_class -> bool
+
+type str_node_map = (string, Procdesc.Node.t) Caml.Hashtbl.t
 
 type t =
   {
-    tenv : Sil.tenv;
+    translation_unit_context : CFrontend_config.translation_unit_context;
+    tenv : Tenv.t;
     cg : Cg.t;
     cfg : Cfg.cfg;
-    procdesc : Cfg.Procdesc.t;
+    procdesc : Procdesc.t;
     is_objc_method : bool;
     curr_class: curr_class;
-    is_callee_expression : bool;
-    namespace: string option; (* contains the name of the namespace if we are in the scope of one*)
-    outer_context : t option; (* in case of objc blocks, the context of the method containing the block *)
-    mutable blocks: Procname.t list;  (* List of blocks defined in this method *)
+    return_param_typ : Typ.t option;
+    outer_context : t option; (** in case of objc blocks, the context of the method containing the
+                                  block *)
+    mutable blocks_static_vars : ((Pvar.t * Typ.t) list) Procname.Map.t;
+    label_map : str_node_map;
   }
 
-val get_procdesc : t -> Cfg.Procdesc.t
+val get_procdesc : t -> Procdesc.t
 
 val get_cfg : t -> Cfg.cfg
 
@@ -41,24 +51,22 @@ val get_curr_class : t -> curr_class
 
 val get_curr_class_name : curr_class -> string
 
+val get_curr_class_decl_ptr : curr_class -> Clang_ast_t.pointer
+
 val curr_class_to_string : curr_class -> string
-
-val curr_class_compare : curr_class -> curr_class -> int
-
-val curr_class_equal : curr_class -> curr_class -> bool
-
-val curr_class_hash : curr_class -> int
 
 val is_objc_method : t -> bool
 
-val get_tenv : t -> Sil.tenv
+val get_tenv : t -> Tenv.t
 
-val create_context : Sil.tenv -> Cg.t -> Cfg.cfg -> Cfg.Procdesc.t ->
-  string option -> curr_class -> bool -> t option -> t
+val create_context : CFrontend_config.translation_unit_context -> Tenv.t -> Cg.t -> Cfg.cfg ->
+  Procdesc.t -> curr_class -> Typ.t option -> bool -> t option -> t
 
-val create_curr_class : Sil.tenv -> string -> curr_class
+val create_curr_class : Tenv.t -> string -> Csu.class_kind -> curr_class
 
-val add_block : t -> Procname.t -> unit
+val add_block_static_var : t -> Procname.t -> (Pvar.t * Typ.t) -> unit
+
+val static_vars_for_block : t -> Procname.t -> (Pvar.t * Typ.t) list
 
 val is_objc_instance : t -> bool
 

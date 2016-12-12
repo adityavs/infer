@@ -1,16 +1,16 @@
 /*
-* Copyright (c) 2013 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2013 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 package com.fasterxml.jackson.core;
 
-import com.facebook.infer.models.InferUndefined;
-import com.fasterxml.jackson.core.json.UTF8StreamJsonParser;
+import com.facebook.infer.builtins.InferBuiltins;
+import com.facebook.infer.builtins.InferUndefined;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -19,9 +19,8 @@ public abstract class JsonParser
         implements Closeable, Versioned {
 
     public void close() throws IOException {
-        if (this instanceof UTF8StreamJsonParser) {
-            ((UTF8StreamJsonParser) this).close();
-        }
+        InferBuiltins.__set_mem_attribute(this);
+        InferUndefined.can_throw_ioexception_void();
     }
 
     private void throwExceptions()

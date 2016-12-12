@@ -7,19 +7,22 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 (** Utility module to retrieve fields of structs of classes *)
+open CFrontend_utils
 
+type field_type = Ident.fieldname * Typ.t * (Annot.t * bool) list
 
-val fields_superclass : Sil.tenv -> Clang_ast_t.obj_c_interface_decl_info ->
-  (Ident.fieldname * Sil.typ * Sil.item_annotation) list
+val get_fields : Ast_utils.type_ptr_to_sil_type -> Tenv.t -> CContext.curr_class ->
+  Clang_ast_t.decl list -> field_type list
 
-type field_type = Ident.fieldname * Sil.typ * (Sil.annotation * bool) list
+val fields_superclass :
+  Tenv.t -> Clang_ast_t.obj_c_interface_decl_info -> Csu.class_kind -> field_type list
 
-val get_fields : Sil.tenv -> CContext.curr_class -> Clang_ast_t.decl list -> field_type list
+val build_sil_field : Ast_utils.type_ptr_to_sil_type -> Tenv.t -> Clang_ast_t.named_decl_info ->
+  Clang_ast_t.type_ptr -> Clang_ast_t.property_attribute list -> field_type
 
-val fields_superclass : Sil.tenv -> Clang_ast_t.obj_c_interface_decl_info -> field_type list
+val add_missing_fields : Tenv.t -> string -> Csu.class_kind -> field_type list -> unit
 
-val build_sil_field_property : CContext.curr_class -> Sil.tenv -> Clang_ast_t.named_decl_info ->
-  Clang_ast_t.type_ptr -> Clang_ast_t.property_attribute list option -> field_type
-
-val add_missing_fields : Sil.tenv -> string -> field_type list -> unit
+val modelled_field : Clang_ast_t.named_decl_info -> field_type list

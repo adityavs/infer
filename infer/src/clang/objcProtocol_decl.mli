@@ -7,7 +7,13 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 (** In this module an ObjC protocol declaration or implementation is processed. The protocol    *)
 (** is saved in the tenv as a struct with the corresponding methods  *)
 
-val protocol_decl : Sil.tenv -> string -> Clang_ast_t.decl list -> CContext.curr_class
+open CFrontend_utils
+
+val protocol_decl : Ast_utils.type_ptr_to_sil_type -> Tenv.t -> Clang_ast_t.decl -> Typ.t
+
+val is_protocol : Clang_ast_t.decl -> bool

@@ -7,8 +7,18 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 (** Module to register and invoke callbacks *)
 
+type proc_callback_args = {
+  get_proc_desc : Procname.t -> Procdesc.t option;
+  get_procs_in_file : Procname.t -> Procname.t list;
+  idenv : Idenv.t;
+  tenv : Tenv.t;
+  proc_name : Procname.t;
+  proc_desc : Procdesc.t;
+}
 
 (** Type of a procedure callback:
     - List of all the procedures the callback will be called on.
@@ -16,19 +26,13 @@
     - Idenv to look up the definition of ids in a cfg.
     - Type environment.
     - Procedure for the callback to act on. *)
-type proc_callback_t =
-  Procname.t list ->
-  (Procname.t -> Cfg.Procdesc.t option) ->
-  Idenv.t ->
-  Sil.tenv ->
-  Procname.t ->
-  Cfg.Procdesc.t ->
-  unit
+type proc_callback_t = proc_callback_args -> unit
 
 type cluster_callback_t =
+  Exe_env.t ->
   Procname.t list ->
-  (Procname.t -> Cfg.Procdesc.t option) ->
-  (Idenv.t * Sil.tenv * Procname.t * Cfg.Procdesc.t) list ->
+  (Procname.t -> Procdesc.t option) ->
+  (Idenv.t * Tenv.t * Procname.t * Procdesc.t) list ->
   unit
 
 (** register a procedure callback *)
@@ -42,6 +46,3 @@ val unregister_all_callbacks : unit -> unit
 
 (** Invoke all the registered callbacks. *)
 val iterate_callbacks : (Procname.t -> unit) -> Cg.t -> Exe_env.t -> unit
-
-(** Find synthetic (access or bridge) methods in the procedure and inline them in the cfg. *)
-val proc_inline_synthetic_methods: Cfg.cfg -> Cfg.Procdesc.t -> unit

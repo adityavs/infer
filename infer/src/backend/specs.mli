@@ -8,9 +8,9 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
-(** Specifications and spec table *)
+open! IStd
 
-open Utils
+(** Specifications and spec table *)
 
 (** {2 Spec Tables} *)
 
@@ -24,14 +24,14 @@ module Jprop : sig
   (** Comparison for joined_prop *)
   val compare : 'a t -> 'a t -> int
 
+  (** Return true if the two join_prop's are equal *)
+  val equal : 'a t -> 'a t -> bool
+
   (** Dump the toplevel prop *)
   val d_shallow : Prop.normal t -> unit
 
   (** dump a joined prop list, the boolean indicates whether to print toplevel props only *)
   val d_list : bool -> Prop.normal t list -> unit
-
-  (** Return true if the two join_prop's are equal *)
-  val equal : 'a t -> 'a t -> bool
 
   (** Add fav to a jprop *)
   val fav_add : Sil.fav -> 'a t -> unit
@@ -48,10 +48,10 @@ module Jprop : sig
   val map : ('a Prop.t -> 'b Prop.t) -> 'a t -> 'b t
 
   (** Print a list of joined props, the boolean indicates whether to print subcomponents of joined props *)
-  val pp_list : printenv -> bool -> Format.formatter -> Prop.normal t list -> unit
+  val pp_list : Pp.env -> bool -> Format.formatter -> Prop.normal t list -> unit
 
   (** Print the toplevel prop *)
-  val pp_short : printenv -> Format.formatter -> Prop.normal t -> unit
+  val pp_short : Pp.env -> Format.formatter -> Prop.normal t -> unit
 
   (** Extract the number associated to the toplevel jprop of a prop *)
   val to_number : 'a t -> int
@@ -61,7 +61,7 @@ module Jprop : sig
 end
 
 (** set of visited nodes: node id and list of lines of all the instructions *)
-module Visitedset : Set.S with type elt = int * int list
+module Visitedset : Caml.Set.S with type elt = Procdesc.Node.id * int list
 
 (** convert a Visitedset to a string *)
 val visited_str : Visitedset.t -> string
@@ -72,15 +72,19 @@ val visited_str : Visitedset.t -> string
     visited: a list of pairs (node_id, line) for the visited nodes *)
 type 'a spec = { pre: 'a Jprop.t; posts: ('a Prop.t * Paths.Path.t) list; visited : Visitedset.t }
 
-module NormSpec : sig (* encapsulate type for normalized specs *)
+(** encapsulate type for normalized specs *)
+module NormSpec : sig
   type t
+
+  val erase_join_info_pre : Tenv.t -> t -> t (** Erase join info from pre of spec *)
 end
 
-module CallStats : (** module for tracing stats of function calls *)
-sig
+(** module for tracing stats of function calls *)
+module CallStats : sig
   type t
 
-  type call_result = (** kind of result of a procedure call *)
+  (** kind of result of a procedure call *)
+  type call_result =
     | CR_success (** successful call *)
     | CR_not_met (** precondition not met *)
     | CR_not_found (** the callee has no specs *)
@@ -102,13 +106,13 @@ end
 (** Execution statistics *)
 type stats =
   { stats_time: float; (** Analysis time for the procedure *)
-    stats_timeout: bool; (** Flag to indicate whether a timeout occurred *)
+    stats_failure:
+      SymOp.failure_kind option; (** what type of failure stopped the analysis (if any) *)
     stats_calls: Cg.in_out_calls; (** num of procs calling, and called *)
     symops: int; (** Number of SymOp's throughout the whole analysis of the function *)
     mutable nodes_visited_fp : IntSet.t; (** Nodes visited during the footprint phase *)
     mutable nodes_visited_re : IntSet.t; (** Nodes visited during the re-execution phase *)
     call_stats : CallStats.t;
-    cyclomatic : int;
   }
 
 type status = ACTIVE | INACTIVE | STALE
@@ -117,15 +121,25 @@ type phase = FOOTPRINT | RE_EXECUTION
 
 type dependency_map_t = int Procname.Map.t
 
+type call_summary = CallSite.Set.t Annot.Map.t
+
 (** Payload: results of some analysis *)
 type payload =
-  | PrePosts of NormSpec.t list (** list of specs *)
-  | TypeState of unit TypeState.t option (** final typestate *)
+  {
+    preposts : NormSpec.t list option; (** list of specs *)
+    typestate : unit TypeState.t option; (** final typestate *)
+    calls:  call_summary option; (** list of calls of the form (call, loc) *)
+    crashcontext_frame: Stacktree_j.stacktree option;
+    (** Procedure location and blame_range info for crashcontext analysis *)
+    quandary : QuandarySummary.t option;
+    siof : SiofDomain.astate option;
+    threadsafety : ThreadSafetyDomain.astate option;
+  }
 
 (** Procedure summary *)
 type summary =
   { dependency_map: dependency_map_t;  (** maps children procs to timestamp as last seen at the start of an analysys phase for this proc *)
-    nodes: int list; (** ids of cfg nodes of the procedure *)
+    nodes: Procdesc.Node.id list; (** ids of cfg nodes of the procedure *)
     phase: phase; (** in FOOTPRINT phase or in RE_EXECUTION PHASE *)
     payload: payload;  (** payload containing the result of some analysis *)
     sessions: int ref; (** Session number: how many nodes went trough symbolic execution *)
@@ -133,19 +147,11 @@ type summary =
     status: status; (** ACTIVE when the proc is being analyzed *)
     timestamp: int; (** Timestamp of the specs, >= 0, increased every time the specs change *)
     attributes : ProcAttributes.t; (** Attributes of the procedure *)
+    proc_desc_option : Procdesc.t option;
   }
-
-(** origin of a summary: current results dir, a spec library, or models *)
-type origin =
-  | Res_dir
-  | Spec_lib
-  | Models
 
 (** Add the summary to the table for the given function *)
 val add_summary : Procname.t -> summary -> unit
-
-(** Check if a summary for a given procedure exists in the results directory *)
-val summary_exists : Procname.t -> bool
 
 (** Check if a summary for a given procedure exists in the models directory *)
 val summary_exists_in_models : Procname.t -> bool
@@ -156,6 +162,12 @@ val clear_spec_tbl : unit -> unit
 (** Dump a spec *)
 val d_spec : 'a spec -> unit
 
+(** Returns true if the procedure is a model *)
+val is_model: Procname.t -> bool
+
+(** Return the summary option for the procedure name *)
+val get_summary : Procname.t -> summary option
+
 (** Get the procedure name *)
 val get_proc_name : summary -> Procname.t
 
@@ -163,22 +175,16 @@ val get_proc_name : summary -> Procname.t
 val get_attributes : summary -> ProcAttributes.t
 
 (** Get the return type of the procedure *)
-val get_ret_type : summary -> Sil.typ
+val get_ret_type : summary -> Typ.t
 
 (** Get the formal paramters of the procedure *)
-val get_formals : summary -> (string * Sil.typ) list
+val get_formals : summary -> (Mangled.t * Typ.t) list
 
 (** Get the flag with the given key for the procedure, if any *)
-val get_flag : Procname.t -> string -> string option
-
-(** Get the iterations associated to the procedure if any, or the default timeout from the command line *)
-val get_iterations : Procname.t -> int
+val get_flag : summary -> string -> string option
 
 (** Return the current phase for the proc *)
-val get_phase : Procname.t -> phase
-
-(** Return the origin of the spec file *)
-val get_origin: Procname.t -> origin
+val get_phase : summary -> phase
 
 (** Return the signature of a procedure declaration as a string *)
 val get_signature : summary -> string
@@ -187,13 +193,10 @@ val get_signature : summary -> string
 val get_specs : Procname.t -> Prop.normal spec list
 
 (** Return the specs and formal parameters for the proc in the spec table *)
-val get_specs_formals : Procname.t -> Prop.normal spec list * (string * Sil.typ) list
+val get_specs_formals : Procname.t -> Prop.normal spec list * (Mangled.t * Typ.t) list
 
 (** Get the specs from the payload of the summary. *)
 val get_specs_from_payload : summary -> Prop.normal spec list
-
-(** Return the summary option for the procedure name *)
-val get_summary : Procname.t -> summary option
 
 (** @deprecated Return the summary for the procedure name. Raises an exception when not found. *)
 val get_summary_unsafe : string -> Procname.t -> summary
@@ -205,25 +208,22 @@ val get_timestamp : summary -> int
 val get_status : summary -> status
 
 (** Check if the procedure is active *)
-val is_active : Procname.t -> bool
-
-(** Check if the procedure is active *)
-val is_inactive : Procname.t -> bool
+val is_active : summary -> bool
 
 (** Initialize the summary for [proc_name] given dependent procs in list [depend_list].
     Do nothing if a summary exists already. *)
 val init_summary :
-  (Procname.t list * (** depend list *)
-   int list * (** nodes *)
-   proc_flags * (** procedure flags *)
-   (Procname.t * Location.t) list * (** calls *)
-   int * (** cyclomatic *)
-   (Cg.in_out_calls option) * (** in and out calls *)
-   ProcAttributes.t) (** attributes of the procedure *)
+  (Procname.t list * (* depend list *)
+   Procdesc.Node.id list * (* nodes *)
+   ProcAttributes.proc_flags * (* procedure flags *)
+   (Procname.t * Location.t) list * (* calls *)
+   (Cg.in_out_calls option) * (* in and out calls *)
+   ProcAttributes.t * (* attributes of the procedure *)
+   Procdesc.t option) (* procdesc option *)
   -> unit
 
 (** Reset a summary rebuilding the dependents and preserving the proc attributes if present. *)
-val reset_summary : Cg.t -> Procname.t -> ProcAttributes.t option -> unit
+val reset_summary : Cg.t -> Procname.t -> ProcAttributes.t option -> Procdesc.t option -> unit
 
 (** Load procedure summary from the given file *)
 val load_summary : DB.filename -> summary option
@@ -235,19 +235,23 @@ val summary_exists : Procname.t -> bool
 val normalized_specs_to_specs : NormSpec.t list -> Prop.normal spec list
 
 (** Print the spec *)
-val pp_spec : printenv -> (int * int) option -> Format.formatter -> Prop.normal spec -> unit
-
-(** Print the spec table, the bool indicates whether to print whole seconds only *)
-val pp_spec_table : printenv -> bool -> Format.formatter -> unit -> unit
+val pp_spec : Pp.env -> (int * int) option -> Format.formatter -> Prop.normal spec -> unit
 
 (** Print the specs *)
-val pp_specs : printenv -> Format.formatter -> Prop.normal spec list -> unit
+val pp_specs : Pp.env -> Format.formatter -> Prop.normal spec list -> unit
 
-(** Print the summary, the bool indicates whether to print whole seconds only *)
-val pp_summary : printenv -> bool -> Format.formatter -> summary -> unit
+(** Print the summary in html format *)
+val pp_summary_html :
+  whole_seconds:bool -> SourceFile.t -> Pp.color -> Format.formatter -> summary -> unit
+
+(** Print the summary in latext format *)
+val pp_summary_latex : whole_seconds:bool -> Pp.color -> Format.formatter -> summary -> unit
+
+(** Print the summary in text format *)
+val pp_summary_text : whole_seconds:bool -> Format.formatter -> summary -> unit
 
 (** Like proc_resolve_attributes but start from a proc_desc. *)
-val pdesc_resolve_attributes : Cfg.Procdesc.t -> ProcAttributes.t
+val pdesc_resolve_attributes : Procdesc.t -> ProcAttributes.t
 
 (** Try to find the attributes for a defined proc.
     First look at specs (to get attributes computed by analysis)
@@ -267,7 +271,7 @@ val re_initialize_dependency_map : dependency_map_t -> dependency_map_t
 val set_status : Procname.t -> status -> unit
 
 (** Convert spec into normal form w.r.t. variable renaming *)
-val spec_normalize : Prop.normal spec -> NormSpec.t
+val spec_normalize : Tenv.t -> Prop.normal spec -> NormSpec.t
 
 (** path to the .specs file for the given procedure in the current results dir *)
 val res_dir_specs_filename : Procname.t -> DB.filename

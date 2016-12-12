@@ -1,20 +1,16 @@
 /*
-* Copyright (c) 2013 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2013 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 package codetoanalyze.java.infer;
 
 
-import java.io.BufferedInputStream;
-import java.io.DataInputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.PushbackInputStream;
+import java.io.*;
 import java.security.DigestInputStream;
 import java.util.zip.CheckedInputStream;
 import java.util.zip.DeflaterInputStream;
@@ -263,4 +259,10 @@ public class FilterInputStreamLeaks {
       if (pms != null) pms.close();
     }
   }
+
+  public void twoLevelWrapperNoLeak(File file) throws IOException {
+    DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
+    in.close();
+  }
+
 }

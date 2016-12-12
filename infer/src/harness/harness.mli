@@ -7,10 +7,9 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 (** Automatically create a harness method to exercise code under test *)
 
-(** Return true if [fieldname] was created by the harness generation *)
-val is_generated_field : Ident.fieldname -> bool
-
 (** Generate a harness method for exe_env and add it to the execution environment *)
-val create_harness : DB.source_file Procname.Map.t -> Sil.tenv -> unit
+val create_harness : Cfg.cfg -> Cg.t -> Tenv.t -> unit

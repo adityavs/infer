@@ -8,9 +8,9 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
-(** Functions for Sets of Propositions with and without sharing *)
+open! IStd
 
-open Utils
+(** Functions for Sets of Propositions with and without sharing *)
 
 (** {2 Sets of Propositions} *)
 
@@ -22,7 +22,7 @@ type t
 val compare : t -> t -> int
 
 (** Singleton set. *)
-val singleton : Prop.normal Prop.t -> t
+val singleton : Tenv.t -> Prop.normal Prop.t -> t
 
 (** Set membership. *)
 val mem : Prop.normal Prop.t -> t -> bool
@@ -34,7 +34,7 @@ val union : t -> t -> t
 val inter : t -> t -> t
 
 (** Add [prop] to propset. *)
-val add : Prop.normal Prop.t -> t -> t
+val add : Tenv.t -> Prop.normal Prop.t -> t -> t
 
 (** Set difference. *)
 val diff : t -> t -> t
@@ -45,15 +45,15 @@ val empty : t
 (** Size of the set *)
 val size : t -> int
 
-val from_proplist : Prop.normal Prop.t list -> t
+val from_proplist : Tenv.t -> Prop.normal Prop.t list -> t
 
 val to_proplist : t -> Prop.normal Prop.t list
 
 (** Apply function to all the elements of the propset. *)
-val map : (Prop.normal Prop.t -> Prop.normal Prop.t) -> t -> t
+val map : Tenv.t -> (Prop.normal Prop.t -> Prop.normal Prop.t) -> t -> t
 
 (** Apply function to all the elements of the propset, removing those where it returns [None]. *)
-val map_option : (Prop.normal Prop.t -> Prop.normal Prop.t option) -> t -> t
+val map_option : Tenv.t -> (Prop.normal Prop.t -> Prop.normal Prop.t option) -> t -> t
 
 (** [fold f pset a] computes [(f pN ... (f p2 (f p1 a))...)],
     where [p1 ... pN] are the elements of pset, in increasing
@@ -76,7 +76,7 @@ val filter : (Prop.normal Prop.t -> bool) -> t -> t
 (** {2 Pretty print} *)
 
 (** Pretty print a set of propositions, obtained from the given prop. *)
-val pp : printenv -> Prop.normal Prop.t -> Format.formatter -> t -> unit
+val pp : Pp.env -> Prop.normal Prop.t -> Format.formatter -> t -> unit
 
 (** dump a propset coming form the given initial prop *)
 val d : Prop.normal Prop.t -> t -> unit

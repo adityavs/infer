@@ -1,22 +1,18 @@
 SOURCES=$(wildcard *.cpp)
-OBJECTS=$(SOURCES:.cpp=.o)
-CXX=g++
-FLAGS=-c -w
+CSOURCES=$(wildcard c_src/*.c)
+OBJECTS=$(patsubst %.c,%_cxx.o, $(CSOURCES)) $(patsubst %.cpp,%.o, $(SOURCES))
+CXX=clang++
+CXXFLAGS=-c -w -std=c++11
 
-default: test
-
-all: test
-
-.PHONY: test
-test: $(OBJECTS)
-	echo "test called\n"
-
-.PHONY: configure
-configure:
-	echo "no configure required\n"
+all: $(OBJECTS) 
 
 clean:
-	rm -rf *.o
+	@rm -rf $(OBJECTS) 
 
-.c.o:
-	$(CXX) $(FLAGS)  $< -o $@
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) $< -o $@
+
+%_cxx.o: %.c
+	$(CXX) $(CXXFLAGS) $< -o $@
+
+.PHONY: all clean

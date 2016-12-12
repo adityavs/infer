@@ -1,15 +1,16 @@
 /*
-* Copyright (c) 2013 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2013 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 package codetoanalyze.java.eradicate;
 
 import java.lang.System;
+import java.net.URL;
 import javax.annotation.Nullable;
 
 import android.annotation.SuppressLint;
@@ -69,6 +70,10 @@ public class ParameterNotNullable {
   public @Nullable String testSystemGetPropertyArgument() {
     String s = System.getProperty(null);
     return s;
+  }
+
+  static @Nullable URL testClassGetResourceArgument(Class cls) {
+    return cls.getResource(null);
   }
 
 }

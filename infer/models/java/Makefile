@@ -1,36 +1,46 @@
-SHELL := /bin/bash
-CWD = $(shell pwd)
-BINDIR = $(CWD)/../../bin
+# Copyright (c) 2015 - present Facebook, Inc.
+# All rights reserved.
+#
+# This source code is licensed under the BSD style license found in the
+# LICENSE file in the root directory of this source tree. An additional grant
+# of patent rights can be found in the PATENTS file in the same directory.
 
-INFER = INFER_ANALYZE_MODELS=1 $(BINDIR)/infer --buck --analyzer infer --multicore 1
+ROOT_DIR = ../../..
+include $(ROOT_DIR)/Makefile.config
 
-ANDROID_JAR = ../../lib/java/android/android-19.jar
-JACKSON_JAR = ../../../dependencies/java/jackson/jackson-2.2.3.jar
+ANDROID_JAR = $(LIB_DIR)/java/android/android-19.jar
+JACKSON_JAR = $(DEPENDENCIES_DIR)/java/jackson/jackson-2.2.3.jar
+INFER_ANNOTATIONS_JAR = $(ANNOTATIONS_DIR)/annotations.jar
 
-REMOVE = rm -rf
-MAKE = mkdir
+MODELS_OUT = models
+INFER_REPORT = $(MODELS_OUT)/infer/report.json
+MODELS_JAR = models.jar
+DEPLOYED_MODELS_JAR = $(LIB_DIR)/java/models.jar
 
-CURRENT_DIR = $(shell pwd)
+JAVA_BUILTINS_SOURCES = $(shell find builtins -name "*.java")
+JAVA_MODELS_SOURCES = $(shell find src -name "*.java")
 
-MODELS_OUT = $(CURRENT_DIR)/models
-CSV_REPORT = $(MODELS_OUT)/infer/report.csv
-MODELS_JAR = $(CURRENT_DIR)/models.jar
-DEPLOYED_MODELS_JAR = ../../lib/java/models.jar
+JAVA_SOURCES = $(JAVA_BUILTINS_SOURCES) $(JAVA_MODELS_SOURCES)
 
-JAVA_SOURCES = $(shell find src -name "*.java")
-
-.PHONY: all clean
-
-all: clean $(MODELS_JAR)
+all: $(MODELS_JAR)
 
 clean:
-	$(REMOVE) $(MODELS_OUT)
-	$(REMOVE) $(DEPLOYED_MODELS_JAR)
+	@rm -fr $(MODELS_OUT)
+	@rm -f $(MODELS_JAR)
+	@rm -f $(DEPLOYED_MODELS_JAR)
 
-$(CSV_REPORT): $(JAVA_SOURCES)
-	mkdir $(MODELS_OUT)
-	$(INFER) -- javac -bootclasspath $(ANDROID_JAR) -d $(MODELS_OUT) -classpath $(JACKSON_JAR) $(JAVA_SOURCES)
+$(INFER_REPORT): $(ANDROID_JAR) $(JACKSON_JAR) $(JAVA_DEPS) $(INFER_ANNOTATIONS_JAR) $(JAVA_SOURCES)
+	@rm -fr $(MODELS_OUT)
+	mkdir -p $(MODELS_OUT)
+	@rm -f $(DEPLOYED_MODELS_JAR)
+	$(INFER_BIN) --jobs 1 --buck --models-mode -- javac -bootclasspath $(ANDROID_JAR) -d $(MODELS_OUT) -classpath $(JACKSON_JAR):$(INFER_ANNOTATIONS_JAR) $(JAVA_SOURCES)
 
-$(MODELS_JAR): $(CSV_REPORT)
-	cd $(MODELS_OUT); jar cf $(MODELS_JAR) *
-	mv $(MODELS_JAR) $(DEPLOYED_MODELS_JAR)
+$(MODELS_JAR): $(INFER_REPORT)
+	cd $(MODELS_OUT); jar cf ../$(MODELS_JAR) *
+
+$(DEPLOYED_MODELS_JAR): $(MODELS_JAR)
+	$(INSTALL_DATA) -C $(MODELS_JAR) $(DEPLOYED_MODELS_JAR)
+
+install: $(DEPLOYED_MODELS_JAR)
+
+.PHONY: all clean install

@@ -7,7 +7,9 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
-type const_map = Cfg.Node.t -> Sil.exp -> Sil.const option
+open! IStd
+
+type const_map = Procdesc.Node.t -> Exp.t -> Const.t option
 
 (** Build a const map lazily. *)
-val build_const_map : Cfg.Procdesc.t -> const_map
+val build_const_map : Tenv.t -> Procdesc.t -> const_map

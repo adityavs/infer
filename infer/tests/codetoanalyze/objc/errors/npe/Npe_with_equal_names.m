@@ -1,43 +1,44 @@
 /*
-* Copyright (c) 2014 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2014 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 #import <Foundation/NSObject.h>
 
-@interface A : NSObject {
-    @public int x;
+@interface EqualNamesA : NSObject {
+ @public
+  int x;
 }
 
-+(A*) meth;
++ (EqualNamesA*)meth;
 
-@property (nonatomic, readonly) A* meth;
+@property(nonatomic, readonly) EqualNamesA* meth;
 
 @end
 
-@implementation A
+@implementation EqualNamesA
 
-+(A*) meth {
-    return [A new];
++ (EqualNamesA*)meth {
+  return [EqualNamesA new];
 }
 
--(A*) meth {
-    return nil;
+- (EqualNamesA*)meth {
+  return nil;
 }
 
 @end
 
-int test() {
-    A* para = [A new];
-    A *a = [para meth];
-    return a->x;
+int EqualNamesTest() {
+  EqualNamesA* para = [EqualNamesA new];
+  EqualNamesA* a = [para meth];
+  return a->x;
 }
 
-int test2(A* para) {
-    A *a = [A meth];
-    return a->x;
+int EqualNamesTest2(EqualNamesA* para) {
+  EqualNamesA* a = [EqualNamesA meth];
+  return a->x;
 }

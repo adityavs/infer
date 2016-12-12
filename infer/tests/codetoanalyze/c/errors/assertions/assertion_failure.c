@@ -1,18 +1,16 @@
 /*
-* Copyright (c) 2013 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2013 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
-#include <stdlib.h>
 #include <assert.h>
+#include <stdlib.h>
 
-void simple_check(int x) {
-  assert(x < 3);
-}
+void simple_check(int x) { assert(x < 3); }
 
 void simple_assertion_failure() {
   int x = 4;
@@ -24,16 +22,12 @@ void no_assertion_failure() {
   simple_check(x);
 }
 
-typedef struct {
-  int value;
-} node;
+typedef struct { int value; } node;
 
-void check_node(node *n) {
-  assert(n->value < 3);
-}
+void check_node(node* n) { assert(n->value < 3); }
 
 node* assertion_failure_with_heap() {
-  node *n = malloc(sizeof(node));
+  node* n = malloc(sizeof(node));
   if (n != NULL) {
     n->value = 4;
     check_node(n);
@@ -42,7 +36,7 @@ node* assertion_failure_with_heap() {
 }
 
 node* no_assertion_failure_with_heap() {
-  node *n = malloc(sizeof(node));
+  node* n = malloc(sizeof(node));
   if (n != NULL) {
     n->value = 2;
     check_node(n);
@@ -58,9 +52,7 @@ void my_assert(int x) {
   }
 }
 
-void should_not_report_assertion_failure(int x) {
-  my_assert(x);
-}
+void should_not_report_assertion_failure(int x) { my_assert(x); }
 
 void should_report_assertion_failure(int x) {
   x = 0;
@@ -69,9 +61,7 @@ void should_report_assertion_failure(int x) {
 
 int global;
 
-void check_global() {
-  assert(global != 0);
-}
+void check_global() { assert(global != 0); }
 
 void skip() {}
 
@@ -84,4 +74,12 @@ void assignment_after_check() {
 void assignemt_before_check() {
   global = 0;
   check_global();
+}
+
+void failure_on_both_branches(int x) {
+  if (x > 3) {
+    simple_check(x);
+  } else {
+    simple_check(42);
+  }
 }

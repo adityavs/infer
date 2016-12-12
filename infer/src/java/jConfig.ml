@@ -8,22 +8,21 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 open Javalib_pack
 
 (** {2 Class names and types} *)
-let infer_builtins_cl = JBasics.make_cn "com.facebook.infer.models.InferBuiltins"
 
-let infer_array_cl = "com.facebook.infer.models.InferArray"
+let builtins_package = "com.facebook.infer.builtins"
 
-let infer_undefined_cl = "com.facebook.infer.models.InferUndefined"
+let infer_builtins_cl = builtins_package ^ ".InferBuiltins"
 
-let infer_object_cl = "com.facebook.infer.models.InferObject"
+let infer_array_cl = builtins_package ^ ".InferArray"
 
-let object_cl = "java.lang.Object"
+let infer_undefined_cl = builtins_package ^ ".InferUndefined"
 
-let java_lang_object_classname = Mangled.from_string object_cl
-
-let obj_type = (JBasics.TObject (JBasics.TClass (JBasics.make_cn object_cl)))
+let obj_type = (JBasics.TObject (JBasics.TClass JBasics.java_lang_object))
 
 let bool_type = JBasics.TBasic `Bool
 
@@ -63,13 +62,13 @@ let run_method = "run"
 
 (** {2 Names of special variables, constants and method names} *)
 
-let this = "this"
+let this = Mangled.from_string "this"
 
 let constructor_name = "<init>"
 
 let clone_name = "clone"
 
-let field_st = "field"
+let field_st = Mangled.from_string "field"
 
 let field_cst = "<field>"
 
@@ -121,12 +120,6 @@ let main_errors_file = "Java_frontend.errors"
 (* the Sawja representation of the Java Bytecode will be printed *)
 let html_mode = ref false
 
-(* debug information will be printed *)
-let debug_mode = ref false
-
-(* The classes in the given jar file will be translated. No sources needed *)
-let dependency_mode = ref false
-
 (* The dynamic dispatch will be handled partially statically *)
 let static_dispatch = ref false
 
@@ -136,9 +129,3 @@ let init_count = ref 0
 let normalize_string s =
   let rexp = Str.regexp_string "$" in
   Str.global_replace rexp "_" s
-
-(* Translate the safety checks doen by the JVM *)
-let translate_checks = ref false
-
-(* Generate harness for Android code *)
-let create_harness = true

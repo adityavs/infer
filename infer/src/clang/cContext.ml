@@ -7,46 +7,58 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+module Hashtbl = Caml.Hashtbl
+
 (** Contains current class and current method to be translated as well as local variables, *)
 (** and the cg, cfg, and tenv corresponding to the current file. *)
 
-open Utils
-open CFrontend_utils
-
 module L = Logging
 
+type pointer (* = Clang_ast_t.pointer *) = int [@@deriving compare]
+
+type _super = string option
+let compare__super _ _ = 0
+
+type _protos = string list
+let compare__protos _ _ = 0
+
 type curr_class =
-  | ContextCls of string * string option * string list
+  | ContextCls of string * _super * _protos
   (*class name and name of (optional) super class , and a list of protocols *)
   | ContextCategory of string * string (* category name and corresponding class *)
   | ContextProtocol of string  (* category name and corresponding class *)
+  | ContextClsDeclPtr of pointer
   | ContextNoCls
+[@@deriving compare]
+
+let equal_curr_class curr_class1 curr_class2 =
+  compare_curr_class curr_class1 curr_class2 = 0
+
+type str_node_map = (string, Procdesc.Node.t) Hashtbl.t
 
 type t =
   {
-    tenv : Sil.tenv;
+    translation_unit_context : CFrontend_config.translation_unit_context;
+    tenv : Tenv.t;
     cg : Cg.t;
     cfg : Cfg.cfg;
-    procdesc : Cfg.Procdesc.t;
+    procdesc : Procdesc.t;
     is_objc_method : bool;
     curr_class: curr_class;
-    is_callee_expression : bool;
-    namespace: string option; (* contains the name of the namespace if we are in the scope of one*)
-    outer_context : t option; (* in case of objc blocks, the context of the method containing the block *)
-    mutable blocks : Procname.t list (* List of blocks defined in this method *)
+    return_param_typ : Typ.t option;
+    outer_context : t option; (** in case of objc blocks, the context of the method containing the
+                                  block *)
+    mutable blocks_static_vars : ((Pvar.t * Typ.t) list) Procname.Map.t;
+    label_map : str_node_map;
   }
 
-let create_context tenv cg cfg procdesc ns curr_class is_objc_method context_opt =
-  { tenv = tenv;
-    cg = cg;
-    cfg = cfg;
-    procdesc = procdesc;
-    curr_class = curr_class;
-    is_callee_expression = false;
-    is_objc_method = is_objc_method;
-    namespace = ns;
-    outer_context = context_opt;
-    blocks = []
+let create_context translation_unit_context tenv cg cfg procdesc curr_class return_param_typ
+    is_objc_method outer_context =
+  { translation_unit_context; tenv; cg; cfg; procdesc; curr_class; return_param_typ;
+    is_objc_method; outer_context;
+    blocks_static_vars = Procname.Map.empty;
+    label_map = Hashtbl.create 17;
   }
 
 let get_cfg context = context.cfg
@@ -66,7 +78,7 @@ let rec is_objc_instance context =
   match context.outer_context with
   | Some outer_context -> is_objc_instance outer_context
   | None ->
-      let attrs = Cfg.Procdesc.get_attributes context.procdesc in
+      let attrs = Procdesc.get_attributes context.procdesc in
       attrs.ProcAttributes.is_objc_instance_method
 
 let rec get_curr_class context =
@@ -78,63 +90,61 @@ let rec get_curr_class context =
 let get_curr_class_name curr_class =
   match curr_class with
   | ContextCls (name, _, _) -> name
-  | ContextCategory (name, cls) -> cls
+  | ContextCategory (_, cls) -> cls
   | ContextProtocol name -> name
+  | ContextClsDeclPtr _ -> assert false
   | ContextNoCls -> assert false
+
+let get_curr_class_decl_ptr curr_class =
+  match curr_class with
+  | ContextClsDeclPtr ptr -> ptr
+  | _ -> assert false
 
 let curr_class_to_string curr_class =
   match curr_class with
   | ContextCls (name, superclass, protocols) ->
-      ("class " ^ name ^ ", superclass: " ^ (Option.default "" superclass) ^
+      ("class " ^ name ^ ", superclass: " ^ (Option.value ~default:"" superclass) ^
        ",  protocols: " ^ (IList.to_string (fun x -> x) protocols))
   | ContextCategory (name, cls) -> ("category " ^ name ^ " of class " ^ cls)
   | ContextProtocol name -> ("protocol " ^ name)
+  | ContextClsDeclPtr ptr -> ("decl_ptr: " ^ string_of_int ptr)
   | ContextNoCls -> "no class"
 
-let curr_class_compare curr_class1 curr_class2 =
-  match curr_class1, curr_class2 with
-  | ContextCls (name1, _, _), ContextCls (name2, _, _) ->
-      String.compare name1 name2
-  | ContextCls (_, _, _), _ -> -1
-  | _, ContextCls (_, _, _) -> 1
-  | ContextCategory (name1, cls1), ContextCategory (name2, cls2) ->
-      Utils.pair_compare String.compare String.compare (name1, cls1) (name2, cls2)
-  | ContextCategory (_, _), _ -> -1
-  | _, ContextCategory (_, _) -> 1
-  | ContextProtocol name1, ContextProtocol name2 ->
-      String.compare name1 name2
-  | ContextProtocol _, _ -> -1
-  | _, ContextProtocol _ -> 1
-  | ContextNoCls, ContextNoCls -> 0
-
-let curr_class_equal curr_class1 curr_class2 =
-  curr_class_compare curr_class1 curr_class2 == 0
-
-let curr_class_hash curr_class =
-  match curr_class with
-  | ContextCls (name, _, _) -> Hashtbl.hash name
-  | ContextCategory (name, cls) -> Hashtbl.hash (name, cls)
-  | ContextProtocol name -> Hashtbl.hash name
-  | ContextNoCls -> Hashtbl.hash "no class"
-
-let create_curr_class tenv class_name =
-  let class_tn_name = Sil.TN_csu (Sil.Class, (Mangled.from_string class_name)) in
-  match Sil.tenv_lookup tenv class_tn_name with
-  | Some Sil.Tstruct(intf_fields, _, _, _, superclasses, methods, annotation) ->
-      (let superclasses_names = IList.map (fun (_, name) -> Mangled.to_string name) superclasses in
-       match superclasses_names with
+let create_curr_class tenv class_name ck =
+  let class_tn_name = Typename.TN_csu (Csu.Class ck, (Mangled.from_string class_name)) in
+  match Tenv.lookup tenv class_tn_name with
+  | Some { supers } ->
+      (let supers_names = IList.map Typename.name supers in
+       match supers_names with
        | superclass:: protocols ->
            ContextCls (class_name, Some superclass, protocols)
        | [] -> ContextCls (class_name, None, []))
   | _ -> assert false
 
-let rec add_block context block =
-  context.blocks <- block :: context.blocks;
-  match context.outer_context with
-  | Some outer_context -> add_block outer_context block
-  | None -> ()
+let add_block_static_var context block_name static_var_typ =
+  match context.outer_context, static_var_typ with
+  | Some outer_context, (static_var, _) when Pvar.is_global static_var ->
+      (let new_static_vars, duplicate =
+         try
+           let static_vars = Procname.Map.find block_name outer_context.blocks_static_vars in
+           if IList.mem (
+               fun (var1, _) (var2, _) -> Pvar.equal var1 var2
+             ) static_var_typ static_vars then
+             static_vars, true
+           else
+             static_var_typ :: static_vars, false
+         with Not_found -> [static_var_typ], false in
+       if not duplicate then
+         let blocks_static_vars =
+           Procname.Map.add block_name new_static_vars outer_context.blocks_static_vars in
+         outer_context.blocks_static_vars <- blocks_static_vars)
+  | _ -> ()
+
+let static_vars_for_block context block_name =
+  try Procname.Map.find block_name context.blocks_static_vars
+  with Not_found -> []
 
 let rec get_outer_procname context =
   match context.outer_context with
   | Some outer_context -> get_outer_procname outer_context
-  | None -> Cfg.Procdesc.get_proc_name context.procdesc
+  | None -> Procdesc.get_proc_name context.procdesc

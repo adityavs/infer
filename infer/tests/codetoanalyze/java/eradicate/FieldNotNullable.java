@@ -1,11 +1,11 @@
 /*
-* Copyright (c) 2013 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2013 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 package codetoanalyze.java.eradicate;
 
@@ -357,10 +357,41 @@ class NestedFieldAccess {
       }
     }
 
+    void testMapContainsKeyInsideWhileLoop (java.util.Map<Integer, String> m) {
+      while (true) {
+        if (m.containsKey(3)) {
+          m.get(3).isEmpty();
+        }
+      }
+    }
+
     void testImmutableMapContainsKey (com.google.common.collect.ImmutableMap<Integer, String> m) {
       if (m.containsKey(3)) {
         m.get(3).isEmpty();
       }
+    }
+  }
+
+  // Test Map.put()
+  class TestPut {
+    String dontAssignNull = "";
+
+    public void putConstString(java.util.Map<String, String> map, String key) {
+      map.put(key, "abc");
+      dontAssignNull = map.get(key);
+    }
+
+    public void putNull(java.util.Map<String, String> map, String key) {
+      map.put(key, "abc");
+      map.put(key, null);
+      dontAssignNull = map.get(key);
+    }
+
+    public void putWithContainsKey(java.util.Map<String, String> map, String key) {
+      if (!map.containsKey(key)) {
+        map.put(key, "abc");
+      }
+      dontAssignNull= map.get(key);
     }
   }
 

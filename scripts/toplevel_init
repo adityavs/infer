@@ -1,0 +1,12 @@
+(* load dependencies *)
+#use "topfind";;
+#thread;;
+#require "core";;
+#require "ctypes";;
+#require "ctypes.foreign";;
+#require "sawja";;
+#require "atdgen";;
+
+(* load infer code *)
+#load_rec "toplevel.cmo";;
+open Toplevel;;

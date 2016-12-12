@@ -8,6 +8,8 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 open Javalib_pack
 open Sawja_pack
 
@@ -18,52 +20,46 @@ type jump_kind =
   | Exit
 
 
-(** data structure for identifying whether a method is the initialiser of a class - that initialises the static fields- or a standard method *)
-type meth_kind =
-  | Normal
-  | Init
-
 (** Hastable for storing nodes that correspond to if-instructions. These are
     used when adding the edges in the contrl flow graph. *)
-module NodeTbl : Hashtbl.S with type key = Cfg.Node.t
+module NodeTbl : Caml.Hashtbl.S with type key = Procdesc.Node.t
 
 
 (** data structure for saving the three structures tht contain the intermediate
     representation of a file: the type environment, the control graph and the control
     flow graph *)
 type icfg = {
-  tenv : Sil.tenv;
+  tenv : Tenv.t;
   cg : Cg.t;
   cfg : Cfg.cfg;
 }
 
 (** data structure for storing the context elements.  *)
-type t
+type t = private
+  { icfg : icfg;
+    procdesc : Procdesc.t;
+    impl : JBir.t;
+    mutable var_map : (Pvar.t * Typ.t * Typ.t) JBir.VarMap.t;
+    if_jumps : int NodeTbl.t;
+    goto_jumps : (int, jump_kind) Caml.Hashtbl.t;
+    cn : JBasics.class_name;
+    source_file : SourceFile.t;
+    program : JClasspath.program;
+  }
 
 
 (** cretes a context for a given method.   *)
 val create_context :
-  Inferconfig.NeverReturnNull.matcher ->
   icfg ->
-  Cfg.Procdesc.t ->
+  Procdesc.t ->
   JBir.t ->
   JBasics.class_name ->
-  meth_kind ->
-  JCode.jcode Javalib.interface_or_class ->
+  SourceFile.t ->
   JClasspath.program ->
   t
 
-(** returns the intermediate representation of the Java file from the context.  *)
-val get_icfg : t -> icfg
-
-(** returns the code of the method from the context *)
-val get_impl : t -> JBir.t
-
-(** returns the class where the method is defined from the context *)
-val get_cn : t -> JBasics.class_name
-
 (** returns the type environment that corresponds to the current file. *)
-val get_tenv : t -> Sil.tenv
+val get_tenv : t -> Tenv.t
 
 (** returns the control graph that corresponds to the current file.  *)
 val get_cg : t -> Cg.t
@@ -71,19 +67,11 @@ val get_cg : t -> Cg.t
 (**  returns the control flow graph that corresponds to the current file. *)
 val get_cfg : t -> Cfg.cfg
 
-(** returns the procedure description in the intermediate language for the
-    current method. *)
-val get_procdesc : t -> Cfg.Procdesc.t
-
-(** returns the method kind of the current method: standard or initialiser of
-    static fields. *)
-val get_meth_kind : t -> meth_kind
-
 (** adds to the context the line that an if-node will jump to *)
-val add_if_jump : t -> Cfg.Node.t -> int -> unit
+val add_if_jump : t -> Procdesc.Node.t -> int -> unit
 
 (** returns whether the given node corresponds to an if-instruction *)
-val get_if_jump : t -> Cfg.Node.t -> int option
+val get_if_jump : t -> Procdesc.Node.t -> int option
 
 (** adds to the context the line that the node in the given line will jump to. *)
 val add_goto_jump : t -> int -> jump_kind -> unit
@@ -95,21 +83,11 @@ val get_goto_jump : t -> int -> jump_kind
 (** returns whether the given line corresponds to a goto instruction.  *)
 val is_goto_jump : t -> int -> bool
 
-(** returns the Java program *)
-val get_program : t -> JClasspath.program
-
-(** returns the current node *)
-val get_node : t -> JCode.jcode Javalib.interface_or_class
-
-(** returns a match function for procedures that are never returning null
-    according to .inferfonfig *)
-val get_never_null_matcher : t -> Inferconfig.NeverReturnNull.matcher
-
 (** [set_pvar context var type] adds a variable with a type to the context  *)
-val set_pvar : t -> JBir.var -> Sil.typ -> Sil.pvar
+val set_pvar : t -> JBir.var -> Typ.t -> Pvar.t
 
 (** [get_var_type context var] returns the type of the variable, if the variable is in the context *)
-val get_var_type : t -> JBir.var -> Sil.typ option
+val get_var_type : t -> JBir.var -> Typ.t option
 
 (** resets the dynamic type of the variables in the context. *)
 val reset_pvar_type : t -> unit
@@ -118,7 +96,7 @@ val reset_pvar_type : t -> unit
 val reset_exn_node_table : unit -> unit
 
 (** adds the exception node for a given method *)
-val add_exn_node : Procname.Hash.key -> Cfg.Node.t -> unit
+val add_exn_node : Procname.t -> Procdesc.Node.t -> unit
 
 (** returns the exception node of a given method *)
-val get_exn_node : Cfg.Procdesc.t -> Cfg.Node.t option
+val get_exn_node : Procdesc.t -> Procdesc.Node.t option

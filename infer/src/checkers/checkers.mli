@@ -7,6 +7,8 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 (** Module for user-defined checkers. *)
 
 
@@ -14,13 +16,15 @@
 module ST : sig
   (** Add a key/value pair. *)
   val pname_add : Procname.t -> string -> string -> unit
+
   (** Find the value associated to the key. Raise Not_found if it does not exist. *)
   val pname_find: Procname.t -> string -> string
 
   (** Report an error. *)
   val report_error:
+    Tenv.t ->
     Procname.t ->
-    Cfg.Procdesc.t ->
+    Procdesc.t ->
     string ->
     Location.t ->
     ?advice: string option ->
@@ -51,3 +55,4 @@ val callback_check_write_to_parcel : Callbacks.proc_callback_t
 val callback_find_deserialization : Callbacks.proc_callback_t
 val callback_check_field_access : Callbacks.proc_callback_t
 val callback_print_c_method_calls : Callbacks.proc_callback_t
+val callback_print_access_to_globals : Callbacks.proc_callback_t

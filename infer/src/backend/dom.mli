@@ -8,24 +8,24 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
-(** Join and Meet Operators *)
+open! IStd
 
-open Utils
+(** Join and Meet Operators *)
 
 (** {2 Join Operators} *)
 
 (** Join two pathsets *)
 val pathset_join :
-  Procname.t -> Sil.tenv -> Paths.PathSet.t -> Paths.PathSet.t -> Paths.PathSet.t * Paths.PathSet.t
+  Procname.t -> Tenv.t -> Paths.PathSet.t -> Paths.PathSet.t -> Paths.PathSet.t * Paths.PathSet.t
 
 val join_time : float ref
 
-val proplist_collapse_pre : Prop.normal Prop.t list -> Prop.normal Specs.Jprop.t list
+val proplist_collapse_pre : Tenv.t -> Prop.normal Prop.t list -> Prop.normal Specs.Jprop.t list
 
-val pathset_collapse : Paths.PathSet.t -> Paths.PathSet.t
+val pathset_collapse : Tenv.t -> Paths.PathSet.t -> Paths.PathSet.t
 
 (** reduce the pathset only based on implication checking. *)
-val pathset_collapse_impl : Procname.t -> Sil.tenv -> Paths.PathSet.t -> Paths.PathSet.t
+val pathset_collapse_impl : Procname.t -> Tenv.t -> Paths.PathSet.t -> Paths.PathSet.t
 
 (** {2 Meet Operators} *)
 
@@ -33,4 +33,4 @@ val pathset_collapse_impl : Procname.t -> Sil.tenv -> Paths.PathSet.t -> Paths.P
     by applying the partial meet operator, adds the generated heaps
     to the argument propset, and returns the resulting propset. This function
     is tuned for combining preconditions. *)
-val propset_meet_generate_pre : Propset.t -> Prop.normal Prop.t list
+val propset_meet_generate_pre : Tenv.t -> Propset.t -> Prop.normal Prop.t list

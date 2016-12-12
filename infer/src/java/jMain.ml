@@ -8,161 +8,153 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 open Javalib_pack
 
 module L = Logging
-open Utils
-
-let arg_desc =
-  let options_to_keep = ["-results_dir"; "-project_root"] in
-  let desc =
-    (arg_desc_filter options_to_keep base_arg_desc) @
-    [
-      "-models", Arg.String (fun filename -> JClasspath.add_models filename), Some "paths", "set the path to the jar containing the models";
-      "-debug", Arg.Unit (fun () -> JConfig.debug_mode := true), None, "write extra translation information";
-      "-dependencies", Arg.Unit (fun _ -> JConfig.dependency_mode := true), None, "translate all the dependencies during the capture";
-      "-no-static_final", Arg.Unit (fun () -> JTrans.no_static_final := true), None, "no special treatment for static final fields";
-      "-tracing", Arg.Unit (fun () -> JConfig.translate_checks := true), None,
-      "Translate JVM checks";
-      "-verbose_out", Arg.String (fun path -> JClasspath.set_verbose_out path), None,
-      "Set the path to the javac verbose output"
-    ] in
-  Arg2.create_options_desc false "Parsing Options" desc
-
-let usage =
-  "Usage: InferJava -d compilation_dir -sources filename\n"
-
-let print_usage_exit () =
-  Arg2.usage arg_desc usage;
-  exit(1)
 
 let () =
-  Arg2.parse arg_desc (fun arg -> ()) usage;
-  if Config.analyze_models && !JClasspath.models_jar <> "" then
-    failwith "Not expecting model file when analyzing the models";
-  if not Config.analyze_models && !JClasspath.models_jar = "" then
-    failwith "Java model file is required"
+  match Config.models_mode, Sys.file_exists Config.models_jar = `Yes with
+  | true, false ->
+      ()
+  | false, false ->
+      failwith "Java model file is required"
+  | true, true ->
+      failwith "Not expecting model file when analyzing the models"
+  | false, true ->
+      JClasspath.add_models Config.models_jar
+
+
+let register_perf_stats_report source_file =
+  let stats_dir = Filename.concat Config.results_dir Config.frontend_stats_dir_name in
+  let abbrev_source_file = SourceFile.encoding source_file in
+  let stats_file = Config.perf_stats_prefix ^ "_" ^ abbrev_source_file ^ ".json" in
+  Utils.create_dir Config.results_dir ;
+  Utils.create_dir stats_dir ;
+  PerfStats.register_report_at_exit (Filename.concat stats_dir stats_file)
 
 
 let init_global_state source_file =
+  register_perf_stats_report source_file ;
   Config.curr_language := Config.Java;
-  DB.current_source := source_file;
-  DB.Results_dir.init ();
+  DB.Results_dir.init source_file;
   Ident.NameGenerator.reset ();
-  SymOp.reset_total ();
-  JContext.reset_exn_node_table ();
-  let nLOC = FileLOC.file_get_loc (DB.source_file_to_string source_file) in
-  Config.nLOC := nLOC
+  JContext.reset_exn_node_table ()
 
 
-let store_icfg tenv cg cfg source_file =
-  let source_dir = DB.source_dir_from_source_file !DB.current_source in
-  begin
-    let cfg_file = DB.source_dir_get_internal_file source_dir ".cfg" in
-    let cg_file = DB.source_dir_get_internal_file source_dir ".cg" in
-    Cfg.add_removetemps_instructions cfg;
-    Preanal.doit cfg tenv;
-    Cfg.add_abstraction_instructions cfg;
-    Cg.store_to_file cg_file cg;
-    Cfg.store_cfg_to_file cfg_file true cfg;
-    if !JConfig.debug_mode then
-      begin
-        Config.write_dotty := true;
-        Config.print_types := true;
-        Dotty.print_icfg_dotty cfg [];
-        Cg.save_call_graph_dotty None Specs.get_specs cg
-      end
-  end
+let store_icfg source_file tenv cg cfg =
+  let source_dir = DB.source_dir_from_source_file source_file in
+  let cfg_file = DB.source_dir_get_internal_file source_dir ".cfg" in
+  let cg_file = DB.source_dir_get_internal_file source_dir ".cg" in
+  if Config.create_harness then Harness.create_harness cfg cg tenv;
+  Cg.store_to_file cg_file cg;
+  Cfg.store_cfg_to_file ~source_file cfg_file cfg;
+  if Config.debug_mode || Config.frontend_tests then
+    begin
+      Dotty.print_icfg_dotty source_file cfg;
+      Cg.save_call_graph_dotty source_file Specs.get_specs cg
+    end;
+  (* NOTE: nothing should be written to source_dir after this *)
+  DB.mark_file_updated (DB.source_dir_to_string source_dir)
 
 
 (* Given a source file, its code is translated, and the call-graph, control-flow-graph and type *)
 (* environment are obtained and saved. *)
 let do_source_file
-    never_null_matcher linereader classes program tenv source_basename source_file proc_file_map =
-  JUtils.log "\nfilename: %s (%s)@."
-    (DB.source_file_to_string source_file) source_basename;
-  init_global_state source_file;
+    linereader classes program tenv
+    source_basename package_opt source_file =
+  L.out_debug "\nfilename: %a (%s)@."
+    SourceFile.pp source_file source_basename;
   let call_graph, cfg =
     JFrontend.compute_source_icfg
-      never_null_matcher linereader classes program tenv source_basename source_file in
-  store_icfg tenv call_graph cfg source_file;
-  if JConfig.create_harness then
-    IList.fold_left
-      (fun proc_file_map pdesc ->
-         Procname.Map.add (Cfg.Procdesc.get_proc_name pdesc) source_file proc_file_map)
-      proc_file_map (Cfg.get_all_procs cfg)
-  else proc_file_map
+      linereader classes program tenv
+      source_basename package_opt source_file in
+  store_icfg source_file tenv call_graph cfg
 
 
-let capture_libs never_null_matcher linereader program tenv =
+let capture_libs linereader program tenv =
   let capture_class tenv cn node =
     match node with
     | Javalib.JInterface _ -> ()
     | Javalib.JClass _ when JFrontend.is_classname_cached cn -> ()
     | Javalib.JClass _ ->
         begin
-          let fake_source_file = JClasspath.java_source_file_from_path (JFrontend.path_of_cached_classname cn) in
+          let fake_source_file =
+            SourceFile.from_abs_path (JFrontend.path_of_cached_classname cn) in
           init_global_state fake_source_file;
           let call_graph, cfg =
-            JFrontend.compute_class_icfg
-              never_null_matcher linereader program tenv node fake_source_file in
-          store_icfg tenv call_graph cfg fake_source_file;
+            JFrontend.compute_class_icfg fake_source_file linereader program tenv node in
+          store_icfg fake_source_file tenv call_graph cfg;
           JFrontend.cache_classname cn;
         end in
   JBasics.ClassMap.iter (capture_class tenv) (JClasspath.get_classmap program)
 
 
 (* load a stored global tenv if the file is found, and create a new one otherwise *)
-let load_tenv program =
-  let tenv_filename = DB.global_tenv_fname () in
-  let tenv =
-    if DB.file_exists tenv_filename then
-      begin
-        match Sil.load_tenv_from_file tenv_filename with
-        | None -> Sil.create_tenv ()
-        | Some tenv -> tenv
-      end
-    else
-      Sil.create_tenv () in
-  JTransType.update_tenv tenv program;
-  tenv
+let load_tenv () =
+  match Tenv.load_from_file DB.global_tenv_fname with
+  | None ->
+      Tenv.create ()
+  | Some _ when Config.models_mode ->
+      failwithf
+        "Unexpected tenv file %s found while generating the models"
+        (DB.filename_to_string DB.global_tenv_fname)
+  | Some tenv ->
+      tenv
 
 
 (* Store to a file the type environment containing all the types required to perform the analysis *)
-let save_tenv classpath tenv =
-  if not Config.analyze_models then JTransType.add_models_types tenv;
-  let tenv_filename = DB.global_tenv_fname () in
+let save_tenv tenv =
+  if not Config.models_mode then JTransType.add_models_types tenv;
   (* TODO: this prevents per compilation step incremental analysis at this stage *)
-  if DB.file_exists tenv_filename then DB.file_remove tenv_filename;
-  JUtils.log "writing new tenv %s@." (DB.filename_to_string tenv_filename);
-  Sil.store_tenv_to_file tenv_filename tenv
+  if DB.file_exists DB.global_tenv_fname then DB.file_remove DB.global_tenv_fname;
+  L.out_debug "writing new tenv %s@." (DB.filename_to_string DB.global_tenv_fname);
+  Tenv.store_to_file DB.global_tenv_fname tenv
 
 
 (* The program is loaded and translated *)
 let do_all_files classpath sources classes =
-  JUtils.log "Translating %d source files (%d classes)@."
-    (StringMap.cardinal sources)
+  L.do_out "Translating %d source files (%d classes)@."
+    (String.Map.length sources)
     (JBasics.ClassSet.cardinal classes);
-  let program = JClasspath.load_program classpath classes sources in
-  let tenv = load_tenv program in
+  let program = JClasspath.load_program classpath classes in
+  let tenv = load_tenv () in
   let linereader = Printer.LineReader.create () in
-  let never_null_matcher = Inferconfig.NeverReturnNull.load_matcher (Inferconfig.inferconfig ()) in
-  let proc_file_map =
-    StringMap.fold
-      (do_source_file never_null_matcher linereader classes program tenv)
-      sources
-      Procname.Map.empty in
-  if !JConfig.dependency_mode then
-    capture_libs never_null_matcher linereader program tenv;
-  if JConfig.create_harness then Harness.create_harness proc_file_map tenv;
-  save_tenv classpath tenv;
-  JUtils.log "done @."
+  let skip source_file =
+    let is_path_matching path =
+      IList.exists
+        (fun pattern -> Str.string_match (Str.regexp pattern) path 0)
+        Config.skip_analysis_in_path in
+    is_path_matching (SourceFile.to_rel_path source_file)
+    || Inferconfig.skip_translation_matcher source_file Procname.empty_block in
+  let translate_source_file basename (package_opt, _) source_file =
+    init_global_state source_file;
+    if not (skip source_file) then
+      do_source_file linereader classes program tenv basename package_opt source_file in
+  String.Map.iteri
+    ~f:(fun ~key:basename ~data:file_entry ->
+       match file_entry with
+       | JClasspath.Singleton source_file ->
+           translate_source_file basename (None, source_file) source_file
+       | JClasspath.Duplicate source_files ->
+           IList.iter
+             (fun (package, source_file) ->
+                translate_source_file basename (Some package, source_file) source_file)
+             source_files)
+    sources;
+  if Config.dependency_mode then
+    capture_libs linereader program tenv;
+  save_tenv tenv;
+  JClasspath.cleanup program;
+  L.out_debug "done @."
 
 
 (* loads the source files and translates them *)
 let () =
+  JBasics.set_permissive true;
   let classpath, sources, classes = JClasspath.load_sources_and_classes () in
-  if StringMap.is_empty sources then
+  if String.Map.is_empty sources then
     failwith "Failed to load any Java source code"
   else
     do_all_files classpath sources classes

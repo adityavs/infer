@@ -1,18 +1,24 @@
 /*
-* Copyright (c) 2009 - 2013 Monoidics ltd.
-* Copyright (c) 2013 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2009 - 2013 Monoidics ltd.
+ * Copyright (c) 2013 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 // builtins to be used to model library functions
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
+
+#ifdef __cplusplus
+// specify C linkage to avoid mangling of names of infer builtins
+// they need to have plain C name so backend can recognise it
+extern "C" {
+#endif
 
 // model returning an arbitrary (nondeterministic) short
 short __infer_nondet_short();
@@ -30,7 +36,7 @@ long long int __infer_nondet_long_long_int();
 unsigned long int __infer_nondet_unsigned_long_int();
 
 // model returning an arbitrary (nondeterministic) pointer
-void *__infer_nondet_ptr();
+void* __infer_nondet_ptr();
 
 // model returning an arbitrary (nondeterministic) float
 float __infer_nondet_float();
@@ -51,17 +57,28 @@ time_t __infer_nondet_time_t();
 clock_t __infer_nondet_clock_t();
 
 // assume that the cond is false
-// and add any constraints to the precondition so that cond is false, if possible
-#define INFER_EXCLUDE_CONDITION(cond) if (cond) while(1)
+// and add any constraints to the precondition so that cond is false, if
+// possible
+#define INFER_EXCLUDE_CONDITION(cond) \
+  if (cond)                           \
+    while (1)
 
-// builtin: force arr to be an array and return the size
-extern size_t __get_array_size(const void *arr);
+// builtin: force arr to be an array
+extern void __require_allocated_array(const void* arr);
+
+// builtin: return the size of arr
+extern size_t __get_array_length(const void* arr);
 
 // builtin: change the attribute of ret to a file attribute
-extern void __set_file_attribute(void *ret);
+extern void __set_file_attribute(void* ret);
 
 // builtin: change the size of the array to size
-extern void __set_array_size(void *ptr, size_t size);
+extern void __set_array_length(void* ptr, size_t size);
 
-// builtin: set the flag to the given value for the procedure where this call appears
-extern void __infer_set_flag(char *flag, char *value);
+// builtin: set the flag to the given value for the procedure where this call
+// appears
+extern void __infer_set_flag(char* flag, char* value);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

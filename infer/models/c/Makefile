@@ -1,24 +1,29 @@
-SHELL := /bin/bash
-CWD = $(shell pwd)
-BINDIR = $(CWD)/../../bin
-LIBDIR = $(CWD)/../../lib
-LIB_SPECS = $(LIBDIR)/specs
-C_MODELS_FILE = $(LIB_SPECS)/c_models
+# Copyright (c) 2015 - present Facebook, Inc.
+# All rights reserved.
+#
+# This source code is licensed under the BSD style license found in the
+# LICENSE file in the root directory of this source tree. An additional grant
+# of patent rights can be found in the PATENTS file in the same directory.
 
-INFER = INFER_ANALYZE_MODELS=1 $(BINDIR)/infer
+ROOT_DIR = ../../..
+include $(ROOT_DIR)/Makefile.config
 
-default: run_infer
+C_MODELS_FILE = $(SPECS_LIB_DIR)/c_models
+C_MODELS_SOURCES = $(shell find src/ -name "*.c")
 
-.PHONY: run_infer install clean
+all: $(C_MODELS_FILE)
 
-run_infer: clean
-	$(INFER) -o $(CWD)/out --models_mode --no_failures_allowed -- make -C src -j
-
-install: run_infer
-	cp out/specs/*.specs $(LIB_SPECS)
+$(C_MODELS_FILE): $(C_MODELS_SOURCES) $(CLANG_DEPS)
+# make clean in src/ in case $(CLANG_DEPS) have changed
+	$(MAKE) -C src clean
+	$(INFER_BIN) -o out/ --models-mode --no-failures-allowed -- $(MAKE) -C src
 	touch $(C_MODELS_FILE)
-	rm -rf out
+
+install: $(C_MODELS_FILE)
+	$(INSTALL_DATA) -C out/specs/*.specs $(SPECS_LIB_DIR)
 
 clean:
-	if [ -a $(C_MODELS_FILE) ];then rm $(C_MODELS_FILE);fi
-	make -C src clean
+	@rm -f $(C_MODELS_FILE)
+	$(MAKE) -C src clean
+
+.PHONY: all clean install

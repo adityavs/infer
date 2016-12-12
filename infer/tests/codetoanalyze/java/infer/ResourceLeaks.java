@@ -1,11 +1,11 @@
 /*
-* Copyright (c) 2013 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2013 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 package codetoanalyze.java.infer;
 
@@ -42,8 +42,10 @@ import java.util.Scanner;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
 import java.util.jar.JarOutputStream;
+import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import java.util.zip.Inflater;
 import java.util.zip.ZipFile;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -78,8 +80,14 @@ public class ResourceLeaks {
     fis.close();
   }
 
+  public void fileOutputStreamOneLeak() throws IOException {
+    FileOutputStream fis = new FileOutputStream("file.txt");
+    if (fis != null) {
+    } else {
+    }
+  }
 
-  public int fileOutputStreamTwoLeaks(boolean ok) throws IOException {
+  public int fileOutputStreamTwoLeaks1(boolean ok) throws IOException {
     FileOutputStream fis = new FileOutputStream("file.txt");
     if (ok) {
       fis.write(1);
@@ -88,6 +96,14 @@ public class ResourceLeaks {
       fis.write(2);
       return 2;
     }
+  }
+
+  public void fileOutputStreamTwoLeaks2() throws IOException {
+    FileOutputStream fis = new FileOutputStream("file.txt");
+    if (fis != null) {
+    } else {
+    }
+    fis = new FileOutputStream("x");
   }
 
   //TwoResources tests
@@ -647,6 +663,28 @@ public class ResourceLeaks {
     }
   }
 
+  private static void myClose(Closeable closeable, boolean swallowIOException) throws IOException {
+    if (closeable == null) {
+      return;
+    }
+    try {
+      closeable.close();
+    } catch (IOException e) {
+      if (!swallowIOException) {
+        throw e;
+      }
+    }
+  }
+
+  public void closeWithCloseablesNestedAlloc() throws IOException {
+    BufferedInputStream b = null;
+    try {
+     b = new BufferedInputStream(new FileInputStream("file.txt"));
+    } finally {
+      myClose(b, false);
+    }
+  }
+
   // JsonParser tests
 
   public void parseFromStringAndNotClose(JsonFactory factory) throws IOException {
@@ -910,6 +948,30 @@ public class ResourceLeaks {
     InputStream s = f.getInputStream(f.getEntry("there"));
     if (s != null) s.toString();
     f.close();
+  }
+
+  public void deflaterLeak() {
+    Deflater comp = new Deflater();
+  }
+
+  public void deflaternoLeak() {
+    Deflater comp = new Deflater();
+    comp.end();
+  }
+
+  public void inflaterLeak() {
+    Inflater decomp = new Inflater();
+  }
+
+  public void inflaterNoLeak() {
+    Inflater decomp = new Inflater();
+    decomp.end();
+  }
+
+  void NoResourceLeakWarningAfterCheckState(File f, int x) throws IOException {
+    InputStream stream = new FileInputStream(f);
+    Preconditions.checkState(x > 0);
+    stream.close();
   }
 
 }

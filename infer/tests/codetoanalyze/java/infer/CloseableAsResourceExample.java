@@ -1,11 +1,11 @@
 /*
-* Copyright (c) 2015 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2015 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 package codetoanalyze.java.infer;
 
@@ -28,6 +28,10 @@ class SomeResource implements Closeable {
   }
 
   public void close() {}
+
+  native void foo(int i);
+  native static void bar(SomeResource r);
+
 }
 
 class Resource implements Closeable {
@@ -147,6 +151,26 @@ public class CloseableAsResourceExample {
   static T sourceOfNullWithResourceLeak() {
     SomeResource r = new SomeResource();
     return null;
+  }
+
+  interface MyCloseable extends Closeable {}
+
+  class MyResource implements MyCloseable {
+    public void close() {}
+  }
+
+  void leakFoundWhenIndirectlyImplementingCloseable() {
+    MyResource res = new MyResource();
+  }
+
+  void skippedCallClosesResourceOnArgs() {
+    SomeResource res = new SomeResource();
+    SomeResource.bar(res);
+  }
+
+  void skippedVritualCallDoesNotCloseResourceOnReceiver() {
+    SomeResource res = new SomeResource();
+    res.foo(42);
   }
 
 }

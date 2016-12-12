@@ -1,57 +1,49 @@
-MAKE = make
-JAVA_MODELS = java
-C_MODELS = c
-CPP_MODELS = cpp
-OBJC_MODELS = objc
-CWD = $(shell pwd)
-BINDIR = $(CWD)/../bin
-LIBDIR = $(CWD)/../lib
-LIB_SPECS = $(LIBDIR)/specs
+# Copyright (c) 2015 - present Facebook, Inc.
+# All rights reserved.
+#
+# This source code is licensed under the BSD style license found in the
+# LICENSE file in the root directory of this source tree. An additional grant
+# of patent rights can be found in the PATENTS file in the same directory.
 
-INFERANALYZE = $(BINDIR)/InferAnalyze
-INFERCLANG = $(BINDIR)/InferClang
-INFERJAVA = $(BINDIR)/InferJava
-JAVA_SCRIPTS = $(addprefix $(BINDIR)/, jwlib.py inferlib.py infer)
-CLANG_SCRIPTS = $(addprefix $(BINDIR)/, inferiOS)  # Add more once this part is stable
+ROOT_DIR = ../..
+include $(ROOT_DIR)/Makefile.config
 
-PLATFORM = $(shell uname)
+C_MODELS_DIR = c
+CPP_MODELS_DIR = cpp
+JAVA_MODELS_DIR = java
+OBJC_MODELS_DIR = objc
 
-JAVA_MODELS_JAR = ../lib/java/models.jar
-
-JAVA_MODELS_SOURCES = $(shell find $(JAVA_MODELS)/src -name "*.java")
-C_MODELS_SOURCES = $(shell find $(C_MODELS)/src -name "*.c")
-CPP_MODELS_SOURCES = $(shell find $(CPP_MODELS)/src -name "*.cpp")
-OBJC_MODELS_SOURCES = $(shell find $(OBJC_MODELS)/src -name "*.m"  -or  -name "*.c")
-
-C_MODELS_FILE = $(LIB_SPECS)/c_models
-CPP_MODELS_FILE = $(LIB_SPECS)/cpp_models
-OBJC_MODELS_FILE = $(LIB_SPECS)/objc_models
-
-.PHONY: java clang clean
-
-java: $(JAVA_MODELS_JAR)
-
-clang: $(C_MODELS_FILE) $(CPP_MODELS_FILE) $(OBJC_MODELS_FILE)
-
-$(JAVA_MODELS_JAR): $(JAVA_MODELS_SOURCES) $(INFERANALYZE) $(INFERJAVA) $(JAVA_SCRIPTS)
-	make -C $(JAVA_MODELS)
-
-$(C_MODELS_FILE): $(C_MODELS_SOURCES) $(INFERANALYZE) $(INFERCLANG)
-	make -C $(C_MODELS) install
-
-$(CPP_MODELS_FILE): $(CPP_MODELS_SOURCES) $(INFERANALYZE) $(INFERCLANG)
-	make -C $(CPP_MODELS) install
-
-$(OBJC_MODELS_FILE): $(OBJC_MODELS_SOURCES) $(INFERANALYZE) $(INFERCLANG)
-ifneq (, $(shell which xcode-select 2>&-))
-	make -C $(OBJC_MODELS) install
-else
-	@echo "Xcode not installed or platform $(PLATFORM) not supported for objc models, skipping."
+CLANG_SUBDIRS = $(C_MODELS_DIR) $(CPP_MODELS_DIR)
+ifneq (no, $(XCODE_SELECT))
+CLANG_SUBDIRS += $(OBJC_MODELS_DIR)
 endif
 
-clean:
-	rm -f $(LIB_SPECS)/*.specs
-	$(MAKE) -C $(JAVA_MODELS) clean
-	$(MAKE) -C $(C_MODELS) clean
-	$(MAKE) -C $(CPP_MODELS) clean
-	$(MAKE) -C $(OBJC_MODELS) clean
+all:
+ifeq ($(BUILD_C_ANALYZERS),yes)
+all: clang
+endif
+ifeq ($(BUILD_JAVA_ANALYZERS),yes)
+all: java
+endif
+
+.PHONY: java clang clean $(CLANG_SUBDIRS)
+
+clean_specs:
+	$(REMOVE) $(SPECS_LIB_DIR)/*.specs
+
+$(CLANG_SUBDIRS):
+	$(MAKE) -C $@ install
+
+clang: clean_specs
+	$(MAKE) $(CLANG_SUBDIRS)
+
+java: clean_specs
+	$(MAKE) -C $@ install
+
+clean: clean_specs
+	$(MAKE) -C $(JAVA_MODELS_DIR) clean
+	$(MAKE) -C $(C_MODELS_DIR) clean
+	$(MAKE) -C $(CPP_MODELS_DIR) clean
+ifneq (no, $(XCODE_SELECT))
+	$(MAKE) -C $(OBJC_MODELS_DIR) clean
+endif

@@ -7,9 +7,10 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 module L = Logging
 module F = Format
-open Utils
 
 type printf_signature = {
   unique_id: string;
@@ -17,15 +18,6 @@ type printf_signature = {
   fixed_pos: int list;
   vararg_pos: int option
 }
-
-let printf_signature_to_string
-    (printf: printf_signature): string =
-  Printf.sprintf
-    "{%s; %d [%s] %s}"
-    printf.unique_id
-    printf.format_pos
-    (String.concat "," (IList.map string_of_int printf.fixed_pos))
-    (match printf.vararg_pos with | Some i -> string_of_int i | _ -> "-")
 
 let printf_like_functions =
   ref
@@ -57,7 +49,7 @@ let printf_like_function
   try
     Some (
       IList.find
-        (fun printf -> string_equal printf.unique_id (Procname.to_unique_id proc_name))
+        (fun printf -> String.equal printf.unique_id (Procname.to_unique_id proc_name))
         !printf_like_functions)
   with Not_found -> None
 
@@ -78,25 +70,25 @@ let format_type_matches_given_type
   match format_type with
   | "d" | "i" | "u" | "x" | "X" | "o" ->
       IList.mem
-        string_equal
+        String.equal
         given_type
         ["java.lang.Integer"; "java.lang.Long"; "java.lang.Short"; "java.lang.Byte"]
   | "a" | "A" | "f" | "F" | "g" | "G" | "e" | "E" ->
       IList.mem
-        string_equal
+        String.equal
         given_type
         ["java.lang.Double"; "java.lang.Float"]
-  | "c" -> string_equal given_type "java.lang.Character"
+  | "c" -> String.equal given_type "java.lang.Character"
   | "b" | "h" | "H" | "s" -> true  (* accepts pretty much anything, even null *)
   | _ -> false
 
 (* The format string and the nvar for the fixed arguments and the nvar of the varargs array *)
 let format_arguments
     (printf: printf_signature)
-    (args: (Sil.exp * Sil.typ) list): (string option * (Sil.exp list) * (Sil.exp option)) =
+    (args: (Exp.t * Typ.t) list): (string option * (Exp.t list) * (Exp.t option)) =
 
   let format_string = match IList.nth args printf.format_pos with
-    | Sil.Const (Sil.Cstr fmt), _ -> Some fmt
+    | Exp.Const (Const.Cstr fmt), _ -> Some fmt
     | _ -> None in
 
   let fixed_nvars = IList.map
@@ -116,17 +108,17 @@ let rec format_string_type_names
     let fmt_re = Str.regexp "%[0-9]*\\.?[0-9]*[A-mo-z]" in (* matches '%2.1d' etc. *)
     let _ = Str.search_forward fmt_re fmt_string start in
     let fmt_match = Str.matched_string fmt_string in
-    let fmt_type = String.sub fmt_match ((String.length fmt_match) - 1) 1 in
+    let fmt_type = String.sub fmt_match ~pos:((String.length fmt_match) - 1) ~len:1 in
     fmt_type:: format_string_type_names fmt_string (Str.match_end ())
   with Not_found -> []
 
 let printf_args_name = "CHECKERS_PRINTF_ARGS"
 
-let check_printf_args_ok
-    (node: Cfg.Node.t)
+let check_printf_args_ok tenv
+    (node: Procdesc.Node.t)
     (instr: Sil.instr)
     (proc_name: Procname.t)
-    (proc_desc: Cfg.Procdesc.t): unit =
+    (proc_desc: Procdesc.t): unit =
 
   (* Check if format string lines up with arguments *)
   let rec check_type_names instr_loc n_arg instr_proc_name fmt_type_names arg_type_names =
@@ -142,7 +134,7 @@ let check_printf_args_ok
               n_arg
               (default_format_type_name ft)
               gt in
-          Checkers.ST.report_error
+          Checkers.ST.report_error tenv
             proc_name
             proc_desc
             printf_args_name
@@ -156,7 +148,7 @@ let check_printf_args_ok
             "format string arguments don't mach provided arguments in %s at line %s"
             instr_name
             instr_line in
-        Checkers.ST.report_error
+        Checkers.ST.report_error tenv
           proc_name
           proc_desc
           printf_args_name
@@ -166,34 +158,34 @@ let check_printf_args_ok
   (* Get the array ivar for a given nvar *)
   let rec array_ivar instrs nvar =
     match instrs, nvar with
-    | Sil.Letderef (id, Sil.Lvar iv, _, _):: _, Sil.Var nid
+    | Sil.Load (id, Exp.Lvar iv, _, _):: _, Exp.Var nid
       when Ident.equal id nid -> iv
-    | i:: is, _ -> array_ivar is nvar
+    | _:: is, _ -> array_ivar is nvar
     | _ -> raise Not_found in
 
   let rec fixed_nvar_type_name instrs nvar =
     match nvar with
-    | Sil.Var nid -> (
+    | Exp.Var nid -> (
         match instrs with
-        | Sil.Letderef (id, Sil.Lvar iv, t, _):: _
+        | Sil.Load (id, Exp.Lvar _, t, _):: _
           when Ident.equal id nid -> PatternMatch.get_type_name t
-        | i:: is -> fixed_nvar_type_name is nvar
+        | _:: is -> fixed_nvar_type_name is nvar
         | _ -> raise Not_found)
-    | Sil.Const c -> PatternMatch.java_get_const_type_name c
+    | Exp.Const c -> PatternMatch.java_get_const_type_name c
     | _ -> raise (Failure "Could not resolve fixed type name") in
 
   match instr with
-  | Sil.Call (_, Sil.Const (Sil.Cfun pn), args, cl, _) -> (
+  | Sil.Call (_, Exp.Const (Const.Cfun pn), args, cl, _) -> (
       match printf_like_function pn with
       | Some printf -> (
           try
             let fmt, fixed_nvars, array_nvar = format_arguments printf args in
-            let instrs = Cfg.Node.get_instrs node in
+            let instrs = Procdesc.Node.get_instrs node in
             let fixed_nvar_type_names = IList.map (fixed_nvar_type_name instrs) fixed_nvars in
             let vararg_ivar_type_names = match array_nvar with
               | Some nvar -> (
                   let ivar = array_ivar instrs nvar in
-                  PatternMatch.get_vararg_type_names node ivar)
+                  PatternMatch.get_vararg_type_names tenv node ivar)
               | None -> [] in
             match fmt with
             | Some fmt ->
@@ -204,7 +196,7 @@ let check_printf_args_ok
                   (format_string_type_names fmt 0)
                   (fixed_nvar_type_names@ vararg_ivar_type_names)
             | None ->
-                Checkers.ST.report_error
+                Checkers.ST.report_error tenv
                   proc_name
                   proc_desc
                   printf_args_name
@@ -215,16 +207,20 @@ let check_printf_args_ok
               "%s Exception when analyzing %s: %s@."
               printf_args_name
               (Procname.to_string proc_name)
-              (Printexc.to_string e))
+              (Exn.to_string e))
       | None -> ())
   | _ -> ()
 
-let callback_printf_args
-    (all_procs : Procname.t list)
-    (get_proc_desc: Procname.t -> Cfg.Procdesc.t option)
-    (idenv: Idenv.t)
-    (tenv: Sil.tenv)
-    (proc_name: Procname.t)
-    (proc_desc : Cfg.Procdesc.t) : unit =
-  Cfg.Procdesc.iter_instrs (fun n i -> check_printf_args_ok n i proc_name proc_desc) proc_desc
+let callback_printf_args { Callbacks.tenv; proc_desc; proc_name } : unit =
+  Procdesc.iter_instrs (fun n i -> check_printf_args_ok tenv n i proc_name proc_desc) proc_desc
 
+(*
+let printf_signature_to_string
+    (printf: printf_signature): string =
+  Printf.sprintf
+    "{%s; %d [%s] %s}"
+    printf.unique_id
+    printf.format_pos
+    (String.concat ~sep:"," (IList.map string_of_int printf.fixed_pos))
+    (match printf.vararg_pos with | Some i -> string_of_int i | _ -> "-")
+*)

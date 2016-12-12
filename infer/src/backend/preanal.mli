@@ -8,10 +8,9 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 (** Preanalysis for eliminating dead local variables *)
 
 (** Perform liveness analysis *)
-val doit : Cfg.cfg -> Sil.tenv -> unit
-
-(** Return the time for the last execution of the analysis *)
-val gettime : unit -> float
+val doit : ?handle_dynamic_dispatch:bool -> Procdesc.t -> Cg.t -> Tenv.t -> unit

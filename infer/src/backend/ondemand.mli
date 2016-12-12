@@ -7,11 +7,16 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 (** Module for on-demand analysis. *)
 
-type analyze_ondemand = Procname.t -> unit
+(** Optional set of source dirs to analyze in on-demand mode. *)
+val dirs_to_analyze : String.Set.t option
 
-type get_proc_desc = Procname.t -> Cfg.Procdesc.t option
+type analyze_ondemand = SourceFile.t -> Procdesc.t -> unit
+
+type get_proc_desc = Procname.t -> Procdesc.t option
 
 type callbacks =
   {
@@ -19,18 +24,21 @@ type callbacks =
     get_proc_desc : get_proc_desc;
   }
 
-(** do_analysis curr_pdesc proc_name
+(** Find a proc desc for the procedure, perhaps loading it from disk. *)
+val get_proc_desc : get_proc_desc
+
+(** analyze_proc_desc curr_pdesc callee_pdesc
+    performs an on-demand analysis of callee_pdesc
+    triggered during the analysis of curr_pdesc. *)
+val analyze_proc_desc : propagate_exceptions:bool -> Procdesc.t -> Procdesc.t -> unit
+
+(** analyze_proc_name curr_pdesc proc_name
     performs an on-demand analysis of proc_name
-    triggered during the analysis of curr_pname. *)
-val do_analysis : Cfg.Procdesc.t -> Procname.t -> unit
+    triggered during the analysis of curr_pdesc. *)
+val analyze_proc_name : propagate_exceptions:bool -> Procdesc.t -> Procname.t -> unit
 
-val one_cluster_per_procedure : unit -> bool
-
-(** Check if the procedure called by the current pdesc needs to be analyzed. *)
-val procedure_should_be_analyzed : Cfg.Procdesc.t -> Procname.t -> bool
-
-(** Mark the return type @Nullable by modifying the spec. *)
-val proc_add_return_nullable : Procname.t -> unit
+(** Check if the procedure called needs to be analyzed. *)
+val procedure_should_be_analyzed : Procname.t -> bool
 
 (** Set the callbacks used to perform on-demand analysis. *)
 val set_callbacks : callbacks -> unit

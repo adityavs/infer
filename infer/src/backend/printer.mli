@@ -8,25 +8,9 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 (** Printers for the analysis results *)
-
-(** return true if the node was visited during footprint and during re-execution*)
-val is_visited_phase : Cfg.Node.t -> bool * bool
-
-(** return true if the node was visited during analysis *)
-val is_visited : Cfg.Node.t -> bool
-
-(** Execute the delayed print actions *)
-val force_delayed_prints : unit -> unit
-
-(** Start a session, and create a new html fine for the node if it does not exist yet *)
-val start_session : Cfg.node -> Location.t -> Procname.t -> int -> unit
-
-(** Finish a session, and perform delayed print actions if required *)
-val finish_session : Cfg.node -> unit
-
-(** Write log file for the proc, the boolean indicates whether to print whole seconds only *)
-val proc_write_log : bool -> Cfg.cfg -> Procname.t -> unit
 
 (** Module to read specific lines from files.
     The data from any file will stay in memory until the handle is collected by the gc *)
@@ -37,14 +21,36 @@ module LineReader : sig
   val create : unit -> t
 
   (** get the line from a source file and line number *)
-  val from_file_linenum_original : t -> DB.source_file -> int -> string option
+  val from_file_linenum_original : t -> SourceFile.t -> int -> string option
 
   (** get the line from a source file and line number looking for the copy of the file in the results dir *)
-  val from_file_linenum : t -> DB.source_file -> int -> string option
+  val from_file_linenum : t -> SourceFile.t -> int -> string option
 
   (** get the line from a location looking for the copy of the file in the results dir *)
   val from_loc : t -> Location.t -> string option
 end
 
-(** Create filename.c.html with line numbers and links to nodes for each file in the exe_env *)
-val c_files_write_html : LineReader.t -> Exe_env.t -> unit
+(** Current html formatter *)
+val curr_html_formatter : Format.formatter ref
+
+(** Execute the delayed print actions *)
+val force_delayed_prints : unit -> unit
+
+(** Finish a session, and perform delayed print actions if required *)
+val node_finish_session : Procdesc.Node.t -> SourceFile.t -> unit
+
+(** Return true if the node was visited during footprint and during re-execution *)
+val node_is_visited : Procname.t -> Procdesc.Node.t -> bool * bool
+
+(** Start a session, and create a new html fine for the node if it does not exist yet *)
+val node_start_session :
+  Procdesc.Node.t -> Location.t -> Procname.t -> int -> SourceFile.t -> unit
+
+(** Write html file for the procedure.
+    The boolean indicates whether to print whole seconds only. *)
+val write_proc_html : SourceFile.t -> bool -> Procdesc.t -> unit
+
+val write_html_file : LineReader.t -> SourceFile.t -> Procdesc.t list -> unit
+
+(** Create filename.ext.html for each file in the exe_env. *)
+val write_all_html_files : Exe_env.t -> unit

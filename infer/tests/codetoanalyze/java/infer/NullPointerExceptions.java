@@ -1,11 +1,11 @@
 /*
-* Copyright (c) 2013 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2013 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 package codetoanalyze.java.infer;
 
@@ -15,6 +15,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.text.TextUtils;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
@@ -24,7 +25,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.lang.System;
+import java.util.concurrent.locks.Lock;
 import java.util.HashMap;
 
 public class NullPointerExceptions {
@@ -394,6 +398,62 @@ public class NullPointerExceptions {
     o.toString();
   }
 
+  public @Nullable Object nullableRet(boolean b) {
+    if (b) {
+      return null;
+    }
+    return new Object();
+  }
+
+  public void derefNullableRet(boolean b) {
+    Object ret = nullableRet(b);
+    ret.toString();
+  }
+
+  public void derefNullableRetOK(boolean b) {
+    Object ret = nullableRet(b);
+    if (ret != null) {
+      ret.toString();
+    }
+  }
+
+  public native @Nullable Object undefNullableRet();
+
+  public void derefUndefNullableRet() {
+    Object ret = undefNullableRet();
+    ret.toString();
+  }
+
+  public void derefUndefNullableRetOK() {
+    Object ret = undefNullableRet();
+    if (ret != null) {
+      ret.toString();
+    }
+  }
+
+  public Object undefNullableWrapper() {
+    return undefNullableRet();
+  }
+
+  public void derefUndefNullableRetWrapper() {
+    undefNullableWrapper().toString();
+  }
+
+  private int returnsThreeOnlyIfRetNotNull(Object obj) {
+    if (obj == null) {
+      return 2;
+    }
+    return 3;
+  }
+
+
+  public void testNullablePrecision() {
+    Object ret = undefNullableRet();
+    if (returnsThreeOnlyIfRetNotNull(ret) == 3) {
+      ret.toString(); // shouldn't warn here
+    }
+  }
+
   public @Nullable String testSystemGetPropertyArgument() {
     String s = System.getProperty(null);
     return s;
@@ -423,6 +483,125 @@ public class NullPointerExceptions {
   void shouldNotReportNPE() {
     Object o = null;
     o.toString();
+  }
+
+  void shouldNotReportOnSkippedSource() {
+    Object o = SkippedSourceFile.createdBySkippedFile();
+    o.toString();
+  }
+
+  int nullListFiles(String pathname) {
+    File dir = new File(pathname);
+    File[] files = dir.listFiles();
+    return files.length; // expect possible NullPointerException as files == null is possible
+  }
+
+  native Object unknownFunc();
+
+  Object callUnknownFunc() {
+    return unknownFunc();
+  }
+
+  void dontReportOnNullableDirectReassignmentToUnknown(@Nullable Object o) {
+    o = unknownFunc();
+    o.toString();
+  }
+
+  void dontReportOnNullableIndirectReassignmentToUnknown(@Nullable Object o) {
+    o = callUnknownFunc();
+    o.toString();
+  }
+
+  String nullTryLock(FileChannel chan) throws IOException {
+    FileLock lock = chan.tryLock();
+    return lock.toString(); // expect possible NullPointerException as lock == null is possible
+  }
+
+  String tryLockThrows(FileChannel chan) {
+    try {
+      FileLock lock = chan.tryLock();
+      return (lock != null ? lock.toString() : "");
+    } catch (IOException e) {
+      Object o = null;
+      return o.toString(); // expect NullPointerException as tryLock can throw
+    }
+  }
+
+  class L {
+    L next;
+  }
+
+  Object returnsNullAfterLoopOnList(L l) {
+    while (l != null) {
+      l = l.next;
+    }
+    return null;
+  }
+
+  void dereferenceAfterLoopOnList(L l) {
+    Object obj = returnsNullAfterLoopOnList(l);
+    obj.toString();
+  }
+
+  void dereferenceAfterUnlock1(Lock l) {
+    l.unlock();
+    String s = l.toString();
+    s = null;
+    s.toString(); // Expect NPE here
+  }
+
+  void dereferenceAfterUnlock2(Lock l) {
+    synchronized(l){
+      String b = null;
+    }
+    String s = l.toString();
+    s = null;
+    s.toString(); // Expect NPE here
+  }
+
+  void optionalNPE(Optional<Object> o) {
+    o.orNull().toString();
+  }
+
+  void stringConstantEqualsTrueNotNPE() {
+    final String c1 = "Test string!";
+    final String c2 = "Test string!";
+    String s = null;
+    if(c1.equals(c1)) {
+      s = "safe";
+    }
+    s.toString(); // No NPE
+    s = null;
+    if(c1.equals(c2)) {
+      s = "safe";
+    }
+    s.toString(); // No NPE
+  }
+
+  void stringConstantEqualsFalseNotNPE_FP() {
+    // This won't actually cause an NPE, but our current model for String.equals
+    // returns boolean_undefined for all cases other than String constant
+    // equality. Consider handling constant inequality in the future.
+    final String c1 = "Test string 1";
+    final String c2 = "Test string 2";
+    String s = null;
+    if(!c1.equals(c2)) {
+      s = "safe";
+    }
+    s.toString(); // No NPE
+  }
+
+  String getString2() {
+    return "string 2";
+  }
+
+  void stringVarEqualsFalseNPE() {
+    final String c1 = "Test string 1";
+    String c2 = "Test " + getString2();
+    String s = null;
+    if(!c1.equals(c2)) {
+      s.toString(); // NPE
+    }
   }
 
 }

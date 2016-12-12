@@ -1,59 +1,97 @@
 /*
-* Copyright (c) 2015 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2015 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 #import "NSNumber.h"
 
-
 @implementation NSNumber
 
-+(NSNumber *)numberWithInt:(int)value {
-    // using alloc as the documentation doesn't say it may return nil
-    NSNumber *number = [self alloc];
-    return [number initWithInt:value];
-}
-
 - (id)initWithInt:(int)v {
-    self->value = (double)v;
-    return self;
-}
-
-+(NSNumber *)numberWithFloat:(float)value {
-    // using alloc as the documentation doesn't say it may return nil
-    NSNumber *number = [NSNumber alloc];
-    return [number initWithInt:value];
+  self->value = (double)v;
+  return self;
 }
 
 - (id)initWithFloat:(float)v {
-    self->value = (double)v;
-    return self;
-}
-
-+(NSNumber *)numberWithDouble:(double)value {
-    // using alloc as the documentation doesn't say it may return nil
-    NSNumber *number = [self alloc];
-    return [number initWithInt:value];
-}
-
-- (id)initWithDouble:(double)v {
-    self->value = v;
-    return self;
-}
-
-+(NSNumber *)numberWithBool:(BOOL)value {
-    // using alloc as the documentation doesn't say it may return nil
-    NSNumber *number = [self alloc];
-    return [number initWithBool:value];
+  return [self initWithInt:(int)v];
 }
 
 - (id)initWithBool:(BOOL)v {
-    self->value = (double)v;
-    return self;
+  return [self initWithInt:(int)v];
+}
+
+- (id)initWithDouble:(double)v {
+  return [self initWithInt:(int)v];
+}
+
+- (id)initWithUnsignedInteger:(NSUInteger)v {
+  return [self initWithInt:(int)v];
+}
+
++ (NSNumber*)numberWithInt:(int)value {
+  // using alloc as the documentation doesn't say it may return nil
+  NSNumber* number = [self alloc];
+  return [number initWithInt:value];
+}
+
++ (NSNumber*)numberWithChar:(char)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithShort:(short)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithBool:(BOOL)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithInteger:(NSInteger)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithFloat:(float)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithDouble:(double)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithLong:(long)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithLongLong:(long long)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithUnsignedInt:(unsigned int)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithUnsignedChar:(unsigned char)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithUnsignedShort:(unsigned short)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithUnsignedInteger:(NSUInteger)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithUnsignedLong:(unsigned long)value {
+  return [NSNumber numberWithInt:(int)value];
+}
+
++ (NSNumber*)numberWithUnsignedLongLong:(unsigned long long)value {
+  return [NSNumber numberWithInt:(int)value];
 }
 
 @end

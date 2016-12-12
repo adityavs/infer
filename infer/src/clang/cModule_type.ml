@@ -7,23 +7,32 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
-type block_data = CContext.t * Clang_ast_t.type_ptr * Procname.t * (Mangled.t * Sil.typ * bool) list
+open! IStd
+
+type block_data = CContext.t * Clang_ast_t.type_ptr * Procname.t * (Pvar.t * Typ.t) list
 
 type instr_type = [
   | `ClangStmt of Clang_ast_t.stmt
   | `CXXConstructorInit of Clang_ast_t.cxx_ctor_initializer
 ]
 
+type decl_trans_context = [ `DeclTraversal | `Translation ]
+
 module type CTranslation =
 sig
-  val instructions_trans : CContext.t -> Clang_ast_t.stmt list -> instr_type list ->
-    Cfg.Node.t -> Cfg.Node.t list
+  (** Translates instructions: (statements and expressions) from the ast into sil *)
+
+  (** It receives the context, a list of statements from clang ast, list of custom statments to be
+      added before clang statements and the exit node and it returns a list of cfg nodes that
+      represent the translation of the stmts into sil. *)
+  val instructions_trans : CContext.t -> Clang_ast_t.stmt -> instr_type list ->
+    Procdesc.Node.t -> Procdesc.Node.t list
 end
 
-module type CMethod_declaration =
-sig
-  val function_decl : Sil.tenv -> Cfg.cfg -> Cg.t -> string option -> Clang_ast_t.decl ->
-    block_data option -> unit
+module type CFrontend = sig
+  val function_decl : CFrontend_config.translation_unit_context -> Tenv.t -> Cfg.cfg -> Cg.t ->
+    Clang_ast_t.decl -> block_data option -> unit
 
-  val process_getter_setter : CContext.t ->  Procname.t -> bool
+  val translate_one_declaration : CFrontend_config.translation_unit_context -> Tenv.t -> Cg.t ->
+    Cfg.cfg -> decl_trans_context -> Clang_ast_t.decl -> unit
 end

@@ -8,33 +8,42 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
+open! IStd
+
 open Javalib_pack
 open Sawja_pack
-
-(** If active, disable special treatment of static final fields. *)
-val no_static_final : bool ref
 
 (** Data structure for storing the results of the translation of an instruction.   *)
 type translation =
   | Skip
-  | Instr of Cfg.Node.t
-  | Prune of Cfg.Node.t * Cfg.Node.t
-  | Loop of Cfg.Node.t * Cfg.Node.t * Cfg.Node.t
+  | Instr of Procdesc.Node.t
+  | Prune of Procdesc.Node.t * Procdesc.Node.t
+  | Loop of Procdesc.Node.t * Procdesc.Node.t * Procdesc.Node.t
 
-(** data structure to identify whether a method is defined in the given program  *)
-type defined_status =
-  | Defined of Cfg.Procdesc.t
-  | Called of Cfg.Procdesc.t
+val is_java_native : JCode.jcode Javalib.concrete_method  -> bool
 
-(** returns the procedure description of the given method and creates it if it hasn't been created before *)
-val get_method_procdesc : JClasspath.program -> Cfg.cfg -> Sil.tenv -> JBasics.class_name ->
-  JBasics.method_signature -> Procname.method_kind -> defined_status
+(** Create the procedure description for an abstract method *)
+val create_am_procdesc :
+  JClasspath.program -> JContext.icfg -> Javalib.abstract_method -> Procname.t -> Procdesc.t
 
-(** [create_local_procdesc linereader cfg tenv program m] creates a procedure description for the method m and adds it to cfg  *)
-val create_local_procdesc : JClasspath.program -> Printer.LineReader.t -> Cfg.cfg -> Sil.tenv -> JCode.jcode Javalib.interface_or_class -> JCode.jcode Javalib.jmethod -> unit
+(** Create the procedure description for a concrete method *)
+val create_native_procdesc :
+  JClasspath.program ->
+  JContext.icfg ->
+  JCode.jcode Javalib.concrete_method ->
+  Procname.t ->
+  Procdesc.t
 
-(** returns the implementation of a given method *)
-val get_implementation : JCode.jcode Javalib.concrete_method -> JBir.t
+(** [create_procdesc source_file program linereader icfg cm proc_name] creates
+    a procedure description for the concrete method cm and adds it to cfg *)
+val create_cm_procdesc :
+  SourceFile.t ->
+  JClasspath.program ->
+  Printer.LineReader.t ->
+  JContext.icfg ->
+  JCode.jcode Javalib.concrete_method ->
+  Procname.t ->
+  (Procdesc.t * Javalib_pack.JCode.jcode * JBir.t) option
 
 (** translates an instruction into a statement node or prune nodes in the cfg *)
 val instruction : JContext.t -> int -> JBir.instr -> translation

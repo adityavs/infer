@@ -1,26 +1,22 @@
 /*
-* Copyright (c) 2013 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2013 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 package java.io;
 
-import com.facebook.infer.models.InferUndefined;
+import com.facebook.infer.builtins.InferBuiltins;
+import com.facebook.infer.builtins.InferUndefined;
 
-public abstract class Reader implements Closeable {
+public abstract class Reader {
 
     public void close() throws IOException {
-        if (this instanceof InputStreamReader) {
-            ((InputStreamReader) this).close();
-        } else if (this instanceof BufferedReader) {
-            ((BufferedReader) this).close();
-        } else if (this instanceof FilterReader) {
-            ((FilterReader) this).close();
-        }
+        InferBuiltins.__set_mem_attribute(this);
+        InferUndefined.can_throw_ioexception_void();
     }
 
     public int read() throws IOException {

@@ -7,15 +7,10 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *)
 
-val inferconfig_home : string option ref
-
-val local_config : string option ref
-
-(** get the path to the .inferconfig file *)
-val inferconfig : unit -> string
+open! IStd
 
 (** Filter type for a source file *)
-type path_filter = DB.source_file -> bool
+type path_filter = SourceFile.t -> bool
 
 (** Filter type for an error name. *)
 type error_filter = Localise.t -> bool
@@ -34,12 +29,16 @@ type filters =
 val do_not_filter : filters
 
 (** Create filters based on the config file *)
-val create_filters : Utils.analyzer -> filters
+val create_filters : Config.analyzer -> filters
 
-module NeverReturnNull : sig
-  type matcher = DB.source_file -> Procname.t -> bool
-  val load_matcher : string -> matcher
-end
+val never_return_null_matcher : SourceFile.t -> Procname.t -> bool
+val suppress_warnings_matcher : SourceFile.t -> Procname.t -> bool
+val skip_translation_matcher : SourceFile.t -> Procname.t -> bool
+val modeled_expensive_matcher : (string -> bool) -> Procname.t -> bool
 
 (** Load the config file and list the files to report on *)
 val test: unit -> unit
+
+(** is_checker_enabled [error_name] is [true] if [error_name] is whitelisted in .inferconfig or if
+    it's enabled by default *)
+val is_checker_enabled : string -> bool

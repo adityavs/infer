@@ -1,12 +1,12 @@
 /*
-* Copyright (c) 2009 - 2013 Monoidics ltd.
-* Copyright (c) 2013 - present Facebook, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the BSD style license found in the
-* LICENSE file in the root directory of this source tree. An additional grant
-* of patent rights can be found in the PATENTS file in the same directory.
-*/
+ * Copyright (c) 2009 - 2013 Monoidics ltd.
+ * Copyright (c) 2013 - present Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
 
 // builtins to be used to model library functions
 
@@ -43,8 +43,8 @@ unsigned long int __infer_nondet_unsigned_long_int() {
 }
 
 // model returning an arbitrary (nondeterministic) pointer
-void *__infer_nondet_ptr() {
-  void *res;
+void* __infer_nondet_ptr() {
+  void* res;
   return res;
 }
 
@@ -84,15 +84,10 @@ clock_t __infer_nondet_clock_t() {
   return t;
 }
 
-long infer__builtin_expect(long e, long x) {
-  if (e == x) {
-    return x;
-  } else {
-    return e;
-  }
-}
-
-void *infer__builtin___memset_chk(void *dest, int val, unsigned long len, unsigned long dstlen) {
+void* infer__builtin___memset_chk(void* dest,
+                                  int val,
+                                  unsigned long len,
+                                  unsigned long dstlen) {
   INFER_EXCLUDE_CONDITION(dstlen < len);
   return dest;
 }
