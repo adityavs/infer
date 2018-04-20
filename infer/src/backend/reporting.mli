@@ -12,34 +12,33 @@ open! IStd
 (** Type of functions to report issues to the error_log in a spec. *)
 
 type log_t =
-  ?loc: Location.t ->
-  ?node_id: (int * int) ->
-  ?session: int ->
-  ?ltr: Errlog.loc_trace ->
-  exn ->
-  unit
-
-type log_issue = Procname.t -> log_t
+  ?loc:Location.t -> ?node_id:int * Caml.Digest.t -> ?session:int -> ?ltr:Errlog.loc_trace
+  -> ?linters_def_file:string -> ?doc_url:string -> ?access:string -> exn -> unit
 
 type log_issue_from_errlog = Errlog.t -> log_t
 
-(** Report an error in the given procedure. *)
-val log_error : log_issue
+val log_error_deprecated : ?store_summary:bool -> Typ.Procname.t -> log_t
+(** Report an error in the given procedure.
+    DEPRECATED as it can create race conditions between checkers.
+    Use log_error instead *)
 
-(** Report a warning in the given procedure. *)
-val log_warning : log_issue
+val log_warning_deprecated : ?store_summary:bool -> Typ.Procname.t -> log_t
+(** Report a warning in the given procedure.
+    DEPRECATED as it can create race conditions between checkers.
+    Use log_warning instead *)
 
-(** Report an info in the given procedure. *)
-val log_info : log_issue
+val log_info_deprecated : ?store_summary:bool -> Typ.Procname.t -> log_t
+(** Report an info in the given procedure.
+    DEPRECATED as it can create race conditions between checkers.
+    Use log_info instead *)
 
+val log_issue_from_errlog :
+  Typ.Procname.t -> ?clang_method_kind:ProcAttributes.clang_method_kind -> Exceptions.err_kind
+  -> log_issue_from_errlog
 (** Report an issue of a given kind  in the given error log. *)
-val log_issue_from_errlog : Exceptions.err_kind -> log_issue_from_errlog
 
-(** Report an error in the given error log. *)
-val log_error_from_errlog : log_issue_from_errlog
+val log_error : Specs.summary -> log_t
+(** Add an error to the given summary. *)
 
-(** Report a warning in the given error log. *)
-val log_warning_from_errlog : log_issue_from_errlog
-
-(** Report an info in the given error log. *)
-val log_info_from_errlog : log_issue_from_errlog
+val log_warning : Specs.summary -> log_t
+(** Add an warning to the given summary. *)

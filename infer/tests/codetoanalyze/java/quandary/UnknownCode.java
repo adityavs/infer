@@ -11,6 +11,9 @@ package codetoanalyze.java.quandary;
 
 import com.facebook.infer.builtins.InferTaint;
 
+import android.content.Intent;
+import android.os.Parcel;
+
 /** testing how the analysis handles missing/unknown code */
 
 public abstract class UnknownCode {
@@ -43,19 +46,46 @@ public abstract class UnknownCode {
     InferTaint.inferSensitiveSink(launderedSource3);
   }
 
-  static void FN_propagateViaInterfaceCodeBad(Interface i) {
+  void callUnknownSetterBad(Intent i) {
+    Object source = InferTaint.inferSecretSource();
+    // we don't analyze the source code for Android, so this will be unknown
+    i.writeToParcel((Parcel) source, 0);
+    InferTaint.inferSensitiveSink(i);
+  }
+
+  void propagateEmptyBad() {
+    String source = (String) InferTaint.inferSecretSource();
+    StringBuffer buffer = new StringBuffer();
+    buffer.append(source); // buffer is now tainted
+    // even though "" is not tainted, buffer and alias should still be tainted
+    StringBuffer alias = buffer.append("");
+    InferTaint.inferSensitiveSink(buffer); // should report
+    InferTaint.inferSensitiveSink(alias); // should report
+  }
+
+  void propagateFootprint(String param) {
+    StringBuffer buffer = new StringBuffer();
+    buffer.append(param);
+    InferTaint.inferSensitiveSink(buffer);
+  }
+
+  void callPropagateFootprintBad() {
+    propagateFootprint((String) InferTaint.inferSecretSource());
+  }
+
+  static void propagateViaInterfaceCodeBad(Interface i) {
     Object source = InferTaint.inferSecretSource();
     Object launderedSource = i.interfaceMethod(source);
     InferTaint.inferSensitiveSink(launderedSource);
   }
 
-  void FN_propagateViaUnknownNativeCodeBad() {
+  void propagateViaUnknownNativeCodeBad() {
     Object source = InferTaint.inferSecretSource();
     Object launderedSource = nativeMethod(source);
     InferTaint.inferSensitiveSink(launderedSource);
   }
 
-  static void FN_propagateViaUnknownAbstractCodeBad() {
+  static void propagateViaUnknownAbstractCodeBad() {
     Object source = InferTaint.inferSecretSource();
     Object launderedSource = nativeMethod(source);
     InferTaint.inferSensitiveSink(launderedSource);

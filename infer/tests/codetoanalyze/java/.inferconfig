@@ -1,5 +1,6 @@
 {
-  "never_returning_null": [
+  "force-delete-results-dir": true,
+  "never-returning-null": [
     {
       "language": "Java",
       "source_contains": "_AUTOMATICALLY_GENERATED_"
@@ -10,19 +11,19 @@
       "method": "get"
     }
   ],
-  "infer-blacklist-files-containing": [
+  "checkers-blacklist-files-containing": [
     "@generated"
   ],
-  "enable_checks": [
+  "enable-issue-type": [
       "GLOBAL_VARIABLE_INITIALIZED_WITH_FUNCTION_OR_METHOD_CALL"
     ],
-  "skip_translation": [
+  "skip-translation": [
     {
       "language": "Java",
       "source_contains": "_SHOULD_BE_SKIPPED_"
     }
   ],
-  "modeled_expensive": [
+  "modeled-expensive": [
     {
       "language": "Java",
       "class": "android.app.Activity",

@@ -23,13 +23,13 @@ infer -- xcodebuild -target HelloWorldApp -sdk iphonesimulator
 infer -- xcodebuild -workspace HelloWorld.xcworkspace -scheme HelloWorld'''
 LANG = ['clang']
 
-CLANG_WRAPPER = os.path.join(config.XCODE_WRAPPERS_DIRECTORY, 'clang')
-CLANGPLUSPLUS_WRAPPER = os.path.join(config.XCODE_WRAPPERS_DIRECTORY,
-                                     'clang++')
+CLANG_WRAPPER = os.path.join(config.WRAPPERS_DIRECTORY, 'clang')
+CLANGPLUSPLUS_WRAPPER = os.path.join(config.WRAPPERS_DIRECTORY, 'clang++')
 
 
 def gen_instance(*args):
     return XcodebuildCapture(*args)
+
 
 create_argparser = util.base_argparser(MODULE_DESCRIPTION, MODULE_NAME)
 

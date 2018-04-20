@@ -10,7 +10,5 @@
 
 open! IStd
 
-(** Preanalysis for eliminating dead local variables *)
-
-(** Perform liveness analysis *)
-val doit : ?handle_dynamic_dispatch:bool -> Procdesc.t -> Cg.t -> Tenv.t -> unit
+val do_preanalysis : Procdesc.t -> Tenv.t -> unit
+(** Various preanalysis passes for transforming the IR in useful ways *)

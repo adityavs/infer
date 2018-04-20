@@ -8,7 +8,30 @@
  */
 
 %{
-  open Ctl_parser_types
+  module L = Logging
+
+  open! IStd
+
+  let formal_params : (ALVar.t list) ref = ref []
+
+  let is_not_infer_reserved_id id =
+    if Str.string_match (Str.regexp_string Ctl_parser_types.infer_prefix) id 0 then
+      raise (CTLExceptions.ALParserInvariantViolationException
+               ("ERROR: " ^ id ^ " contains __infer_ctl_ that is a reserved keyword "
+            ^ "which cannot be used in identifiers:"))
+     else ()
+
+   let is_defined_identifier id =
+       if (List.mem ~equal:ALVar.equal !formal_params (ALVar.Var id)) then
+         L.(debug Linters Verbose) "\tParsed exp '%s' as variable" id
+       else
+         raise (CTLExceptions.ALParserInvariantViolationException
+                  ("ERROR: Variable '" ^ id ^ "' is undefined"))
+
+   let is_valid_astnode node_name =
+      if Clang_ast_proj.is_valid_astnode_kind node_name then ()
+      else
+        raise (CTLExceptions.ALParserInvariantViolationException ("Invalid AST node " ^ node_name))
 
 %}
 
@@ -22,8 +45,10 @@
 %token AG
 %token EH
 %token DEFINE_CHECKER
+%token GLOBAL_MACROS
+%token GLOBAL_PATHS
+%token HASHIMPORT
 %token ET
-%token ETX
 %token WITH_TRANSITION
 %token WHEN
 %token HOLDS_IN_NODE
@@ -42,8 +67,23 @@
 %token OR
 %token NOT
 %token IMPLIES
+%token REGEXP
 %token <string> IDENTIFIER
 %token <string> STRING
+%token WHITELIST_PATH
+%token BLACKLIST_PATH
+%token ACCESSOR_FOR_PROPERTY
+%token ANY
+%token BODY
+%token COND
+%token INIT_EXPR
+%token FIELDS
+%token FIELD_NAME
+%token PARAMETERS
+%token PARAMETER_NAME
+%token PARAMETER_POS
+%token POINTER_TO_DECL
+%token PROTOCOL
 %token EOF
 
 /* associativity and priority (lower to higher) of operators */
@@ -53,30 +93,73 @@
 %left AU, EU
 %right NOT, AX, EX, AF, EF, EG, AG, EH
 
-%start <Ctl_parser_types.ctl_checker list> checkers_list
-
+%start <CTL.al_file> al_file
 %%
+
+var_list:
+  | identifier { [ALVar.Var $1] }
+  | identifier COMMA var_list { ALVar.Var($1) :: $3 }
+;
+
+node_list:
+  | identifier { is_valid_astnode $1; [ALVar.Const $1] }
+  | identifier COMMA node_list { is_valid_astnode $1; ALVar.Const($1) :: $3 }
+;
+
+formal_params:
+  | var_list { formal_params := $1; $1}
+
+al_file:
+  | import_files global_macros global_paths checkers_list {
+      { CTL.import_files = $1; CTL.global_macros = $2; CTL.global_paths = $3; CTL.checkers = $4 }
+    }
+  ;
+
+import_files:
+  | { [] }
+  | HASHIMPORT STRING import_files
+    { L.(debug Linters Verbose) "Parsed import clauses...@\n@\n"; $2 :: $3 }
+  ;
+
+global_macros:
+  | { [] }
+  | GLOBAL_MACROS LEFT_BRACE let_clause_list RIGHT_BRACE SEMICOLON
+    { L.(debug Linters Verbose) "Parsed global macro definitions...@\n@\n"; $3 }
+  ;
+
+global_path_declaration:
+  | LET identifier ASSIGNMENT LEFT_BRACE path_list RIGHT_BRACE SEMICOLON { ($2, $5) }
+;
+
+global_paths_list:
+  | global_path_declaration { [$1] }
+  | global_path_declaration SEMICOLON global_paths_list { $1 :: $3 }
+;
+
+global_paths:
+  | { [] }
+  | GLOBAL_PATHS LEFT_BRACE global_paths_list RIGHT_BRACE SEMICOLON
+    { L.(debug Linters Verbose) "Parsed global path definitions...@\n"; $3 }
+  ;
+
 checkers_list:
   | EOF { [] }
   | checker SEMICOLON checkers_list { $1::$3 }
   ;
 
 checker:
- DEFINE_CHECKER IDENTIFIER ASSIGNMENT LEFT_BRACE clause_list RIGHT_BRACE
-  { let name = $2 in
-    let definitions = $5 in
-    Logging.out "\nParsed checker definition: %s\n" name;
-    IList.iter (fun d -> (match d with
-      | Ctl_parser_types.CSet (clause_name, phi)
-      | Ctl_parser_types.CLet (clause_name, phi) ->
-        Logging.out "    %s=  \n    %a\n\n"
-          clause_name CTL.Debug.pp_formula phi
-      | Ctl_parser_types.CDesc (clause_name, s) ->
-        Logging.out "    %s=  \n    %s\n\n" clause_name s)
-        ) definitions;
-    Logging.out "\n-------------------- \n";
-    { name = name; definitions = definitions }
-    }
+ DEFINE_CHECKER identifier ASSIGNMENT LEFT_BRACE clause_list RIGHT_BRACE
+  {
+    L.(debug Linters Verbose) "@\nParsed checker definition@\n";
+    let c = { CTL.id = $2; CTL.definitions = $5 } in
+    CTL.print_checker c;
+    c
+  }
+;
+
+path_list:
+ | alexp_path { [$1] }
+ | alexp_path COMMA path_list { $1 :: $3 }
 ;
 
 clause_list:
@@ -84,67 +167,163 @@ clause_list:
  | clause SEMICOLON clause_list { $1 :: $3 }
 ;
 
-clause:
-  | SET IDENTIFIER ASSIGNMENT formula
-    { Logging.out "\tParsed set clause\n"; CSet ($2, $4) }
-  | SET IDENTIFIER ASSIGNMENT STRING
-    { Logging.out "\tParsed desc clause\n"; CDesc ($2, $4) }
-  | LET IDENTIFIER ASSIGNMENT formula
-    { Logging.out "\tParsed let clause\n"; CLet ($2, $4) }
+let_clause_list:
+ | let_clause SEMICOLON { [$1] }
+ | let_clause SEMICOLON let_clause_list { $1 :: $3 }
 ;
 
-atomic_formula:
-  | TRUE { Logging.out "\tParsed True\n"; CTL.True }
-  | FALSE { Logging.out "\tParsed False\n"; CTL.False }
-  | IDENTIFIER LEFT_PAREN params RIGHT_PAREN
-    { Logging.out "\tParsed predicate\n"; CTL.Atomic($1, $3) }
+clause:
+  | SET identifier ASSIGNMENT formula
+    { L.(debug Linters Verbose) "\tParsed SET clause@\n";
+    let alvar = match $2 with
+      | "report_when" -> ALVar.Report_when
+      | _ -> L.(die ExternalError) "string '%s' cannot be set to a variable. \
+                       Use the reserved variable 'report_when'" $2 in
+      CTL.CSet (alvar, $4) }
+  | SET WHITELIST_PATH ASSIGNMENT LEFT_BRACE path_list RIGHT_BRACE
+    { CTL.CPath (`WhitelistPath, $5) }
+  | SET BLACKLIST_PATH ASSIGNMENT LEFT_BRACE path_list RIGHT_BRACE
+    { CTL.CPath (`BlacklistPath, $5) }
+  | SET identifier ASSIGNMENT STRING
+    { L.(debug Linters Verbose) "\tParsed SET clause@\n";
+      let alvar = match $2 with
+      | "message" -> ALVar.Message
+      | "suggestion" -> ALVar.Suggestion
+      | "severity" -> ALVar.Severity
+      | "mode" -> ALVar.Mode
+      | "doc_url" -> ALVar.Doc_url
+      | "name" -> ALVar.Name
+      | _ -> L.(die ExternalError)
+              "string '%s' cannot be set in a SET clause. \
+               Use either of: \
+               'doc_url', 'message', 'mode', 'name', 'severity' or 'suggestion'" $2 in
+      CTL.CDesc (alvar, $4) }
+    | let_clause { $1 }
+    ;
+
+let_clause:
+  | LET formula_id_def ASSIGNMENT formula
+    { L.(debug Linters Verbose) "\tParsed LET clause@\n"; CTL.CLet ($2, [], $4) }
+  | LET formula_id_def LEFT_PAREN formal_params RIGHT_PAREN ASSIGNMENT formula
+    { L.(debug Linters Verbose) "\tParsed let clause with formula identifier '%s(....)'@\n"
+        (ALVar.formula_id_to_string $2);
+      CTL.CLet ($2, $4, $7) }
   ;
+
+atomic_formula:
+  | TRUE { L.(debug Linters Verbose) "\tParsed True@\n"; CTL.True }
+  | FALSE { L.(debug Linters Verbose) "\tParsed False@\n"; CTL.False }
+  | identifier LEFT_PAREN actual_params RIGHT_PAREN
+    { L.(debug Linters Verbose) "\tParsed predicate@\n"; CTL.Atomic(ALVar.Formula_id $1, $3) }
+  ;
+
+  formula_id_def:
+  | identifier { L.(debug Linters Verbose) "\tParsed formula identifier '%s'@\n" $1;
+                  formal_params := [];
+                  ALVar.Formula_id $1 }
+   ;
 
  formula_id:
-  | IDENTIFIER { Logging.out "\tParsed formula identifier '%s' \n" $1; CTL.Atomic($1, []) }
+ | identifier { L.(debug Linters Verbose) "\tParsed formula identifier '%s'@\n" $1;
+                 ALVar.Formula_id $1 }
   ;
 
-params:
+actual_params:
   | {[]}
-  | IDENTIFIER { [$1] }
-  | IDENTIFIER COMMA params { $1 :: $3 }
+  | alexp { [$1] }
+  | alexp COMMA actual_params { $1 :: $3 }
   ;
 
 transition_label:
-  | IDENTIFIER { match $1 with
-                  | "Body" | "body" -> Some CTL.Body
-                  | "InitExpr" | "initexpr" -> Some CTL.InitExpr
-                  | "Cond" | "cond" -> Some CTL.Cond
-                  | _  -> None }
+  | ACCESSOR_FOR_PROPERTY alexp { Some (CTL.AccessorForProperty $2) }
+  | ANY { None }
+  | BODY { Some CTL.Body }
+  | COND { Some CTL.Cond }
+  | FIELDS { Some CTL.Fields }
+  | FIELD_NAME alexp { Some (CTL.FieldName $2) }
+  | INIT_EXPR { Some CTL.InitExpr }
+  | PARAMETERS { Some CTL.Parameters }
+  | PARAMETER_NAME alexp { Some (CTL.ParameterName $2) }
+  | PARAMETER_POS alexp { Some (CTL.ParameterPos $2) }
+  | POINTER_TO_DECL { Some CTL.PointerToDecl }
+  | PROTOCOL { Some CTL.Protocol }
   ;
 
 formula_EF:
  | LEFT_PAREN formula RIGHT_PAREN EF { $2 }
 ;
 
-formula:
-  | LEFT_PAREN formula RIGHT_PAREN { $2 }
-  | formula_id { $1 }
-  | atomic_formula { Logging.out "\tParsed atomic formula\n"; $1 }
-  | formula EU formula { Logging.out "\tParsed EU\n"; CTL.EU (None, $1, $3) }
-  | formula AU formula { Logging.out "\tParsed AU\n"; CTL.AU ($1, $3) }
-  | formula AF { Logging.out "\tParsed AF\n"; CTL.AF ($1) }
-  | formula EX { Logging.out "\tParsed EX\n"; CTL.EX (None, $1) }
-  | formula AX { Logging.out "\tParsed AX\n"; CTL.AX ($1) }
-  | formula EG { Logging.out "\tParsed EG\n"; CTL.EG (None, $1) }
-  | formula AG { Logging.out "\tParsed AG\n"; CTL.AG ($1) }
-  | formula EH params { Logging.out "\tParsed EH\n"; CTL.EH ($3, $1) }
-  | formula EF { Logging.out "\tParsed EF\n"; CTL.EF (None, $1) }
-  | WHEN formula HOLDS_IN_NODE params
-     { Logging.out "\tParsed InNode\n"; CTL.InNode ($4, $2)}
-  | ET params WITH_TRANSITION transition_label formula_EF
-     { Logging.out "\tParsed ET\n"; CTL.ET ($2, $4, $5)}
-  | ETX params WITH_TRANSITION transition_label formula_EF
-        { Logging.out "\tParsed ETX\n"; CTL.ETX ($2, $4, $5)}
-  | formula AND formula { Logging.out "\tParsed AND\n"; CTL.And ($1, $3) }
-  | formula OR formula { Logging.out "\tParsed OR\n"; CTL.Or ($1, $3) }
-  | formula IMPLIES formula { Logging.out "\tParsed IMPLIES\n"; CTL.Implies ($1, $3) }
-  | NOT formula { Logging.out "\tParsed NOT\n"; CTL.Not ($2) }
+formula_with_paren:
+ | LEFT_PAREN formula RIGHT_PAREN { $2 }
 ;
 
+formula:
+  | formula_with_paren { $1 }
+  | formula_id { CTL.Atomic($1, []) }
+  | atomic_formula { L.(debug Linters Verbose) "\tParsed atomic formula@\n"; $1 }
+  | formula EU formula { L.(debug Linters Verbose) "\tParsed EU@\n"; CTL.EU (None, $1, $3) }
+  | formula AU formula { L.(debug Linters Verbose) "\tParsed AU@\n"; CTL.AU (None,$1, $3) }
+  | formula AF { L.(debug Linters Verbose) "\tParsed AF@\n"; CTL.AF (None,$1) }
+  | formula EX { L.(debug Linters Verbose) "\tParsed EX@\n"; CTL.EX (None, $1) }
+  | formula EX WITH_TRANSITION transition_label
+     { L.(debug Linters Verbose) "\tParsed EX WITH-TRANSITION '%a'@\n" CTL.Debug.pp_transition $4;
+       CTL.EX ($4, $1) }
+  | formula AX { L.(debug Linters Verbose) "\tParsed AX@\n"; CTL.AX (None, $1) }
+  | formula AX WITH_TRANSITION transition_label
+     { L.(debug Linters Verbose) "\tParsed AX WITH-TRANSITION '%a'@\n" CTL.Debug.pp_transition $4;
+       CTL.AX ($4, $1) }
+  | formula EG { L.(debug Linters Verbose) "\tParsed EG@\n"; CTL.EG (None, $1) }
+  | formula AG { L.(debug Linters Verbose) "\tParsed AG@\n"; CTL.AG (None, $1) }
+  | formula EH node_list { L.(debug Linters Verbose) "\tParsed EH@\n"; CTL.EH ($3, $1) }
+  | formula EF { L.(debug Linters Verbose) "\tParsed EF@\n"; CTL.EF (None, $1) }
+  | formula EF WITH_TRANSITION transition_label
+     { L.(debug Linters Verbose) "\tParsed EF WITH-TRANSITION '%a'@\n" CTL.Debug.pp_transition $4;
+       CTL.EF($4, $1) }
+  | WHEN formula HOLDS_IN_NODE node_list
+     { L.(debug Linters Verbose) "\tParsed InNode@\n"; CTL.InNode ($4, $2)}
+  | ET node_list WITH_TRANSITION transition_label formula_EF
+     { L.(debug Linters Verbose) "\tParsed ET with transition '%a'@\n" CTL.Debug.pp_transition $4;
+       CTL.ET ($2, $4, $5)}
+  | EX WITH_TRANSITION transition_label formula_with_paren
+    { L.(debug Linters Verbose) "\tParsed EX with transition '%a'@\n" CTL.Debug.pp_transition $3;
+      CTL.EX ($3, $4)}
+  | AX WITH_TRANSITION transition_label formula_with_paren
+      { L.(debug Linters Verbose)
+        "\tParsed AX with transition '%a'@\n" CTL.Debug.pp_transition $3;
+        CTL.AX ($3, $4)}
+  | formula AND formula { L.(debug Linters Verbose) "\tParsed AND@\n"; CTL.And ($1, $3) }
+  | formula OR formula { L.(debug Linters Verbose) "\tParsed OR@\n"; CTL.Or ($1, $3) }
+  | formula IMPLIES formula
+      { L.(debug Linters Verbose) "\tParsed IMPLIES@\n"; CTL.Implies ($1, $3) }
+  | NOT formula { L.(debug Linters Verbose) "\tParsed NOT@\n"; CTL.Not ($2) }
+;
+
+
+alexp_const: STRING
+          { is_not_infer_reserved_id $1;
+           L.(debug Linters Verbose) "\tParsed string constant '%s'@\n" $1;
+           ALVar.Const $1 }
+
+alexp_regex:  REGEXP LEFT_PAREN STRING RIGHT_PAREN
+          { L.(debug Linters Verbose) "\tParsed regular expression '%s'@\n" $3;
+            ALVar.Regexp {string=$3; regexp=lazy (Str.regexp $3)} }
+
+alexp_var: identifier { is_defined_identifier $1; ALVar.Var $1 }
+
+alexp:
+ | alexp_const {$1}
+ | alexp_regex {$1}
+ | alexp_var { $1}
+ ;
+
+ alexp_path:
+  | alexp_const {$1}
+  | alexp_regex {$1}
+  | identifier { ALVar.Var $1 }
+  ;
+
+ identifier:
+  | IDENTIFIER { is_not_infer_reserved_id $1;
+                 L.(debug Linters Verbose) "\tParsed identifier '%s'@\n" $1; $1 }
+  ;
 %%

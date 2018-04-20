@@ -8,8 +8,12 @@
 TESTS_DIR = ../../..
 
 ANALYZER = checkers
-INFER_OPTIONS = --no-filtering --debug-exceptions
+INFER_OPTIONS = \
+  --debug-exceptions --no-default-checkers \
+  --annotation-reachability --fragment-retains-view --immutable-cast --printf-args --quandary \
+  --suggest-nullable --check-nullable --racerd \
+
 INFERPRINT_OPTIONS = --issues-tests
-SOURCES = $(wildcard *.java)
+SOURCES = $(wildcard *.java) $(wildcard $(TESTS_DIR)/external/library/*.java)
 
 include $(TESTS_DIR)/javac.make

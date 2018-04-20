@@ -1,12 +1,26 @@
+(* to be used with infertop, infer's custom toplevel *)
+
 (* load dependencies *)
 #use "topfind";;
 #thread;;
-#require "core";;
-#require "ctypes";;
-#require "ctypes.foreign";;
-#require "sawja";;
+#require "ANSITerminal";;
 #require "atdgen";;
+#require "cmdliner";;
+#require "core.top";;
+#require "ctypes";;
+#require "ctypes.stubs";;
+#require "ppx_compare";;
+#require "sawja";;
+#require "sqlite3";;
+#require "xmlm";;
 
-(* load infer code *)
-#load_rec "toplevel.cmo";;
-open Toplevel;;
+open InferStdlib;;
+open InferGenerated;;
+open InferModules;;
+
+(* Most of infer uses this, useful for copy/pasting. Can be (partially) countered by typing `open
+Caml.Pervasives`. *)
+open IStd;;
+
+module L = Logging;;
+module F = Format;;

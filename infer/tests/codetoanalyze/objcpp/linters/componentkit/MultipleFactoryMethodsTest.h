@@ -25,6 +25,9 @@
 
 // Not OK - Using the class name instaed of `instancename` doesn't make this OK
 @interface BadComponent : CKCompositeComponent
+
+@property int x;
+
 + (instancetype)newWithObject1:(NSObject*)obj;
 + (BadComponent*)newWithObject2:(NSObject*)obj;
 @end
@@ -50,4 +53,12 @@
     __attribute__((unavailable("Must use designated initializer")));
 + (instancetype)newWithObject1:(NSObject*)obj;
 + (instancetype)newWithObject2:(NSObject*)obj;
+@end
+
+// 4 initializers -> should output 3 issues
+@interface LotsOfInitializers : CKCompositeComponent
++ (instancetype)newWithObject1:(NSObject*)obj;
++ (instancetype)newWithObject2:(NSObject*)obj;
++ (instancetype)newWithObject3:(NSObject*)obj;
++ (instancetype)newWithObject4:(NSObject*)obj;
 @end

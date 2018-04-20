@@ -9,14 +9,16 @@
 
 package codetoanalyze.java.eradicate;
 
-import android.text.TextUtils;
 import com.google.common.base.Preconditions;
 
-import java.lang.System;
-import javax.annotation.Nullable;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import com.facebook.infer.annotation.Assertions;
-import com.facebook.infer.annotation.FalseOnNull;
-import com.facebook.infer.annotation.TrueOnNull;
+import java.lang.System;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 
 
 public class NullMethodCall {
@@ -242,54 +244,67 @@ public class NullMethodCall {
     int n = s.length();
   }
 
+  int testSystemGetenvBad() {
+    String envValue = System.getenv("WHATEVER");
+    return envValue.length();
+  }
 
-  static class MyTextUtils {
+  class SystemExitDoesNotReturn {
+    native boolean whoknows();
 
-    @TrueOnNull
-    static boolean isEmpty(@Nullable java.lang.CharSequence s) {
-      return s == null || s.equals("");
-    }
-
-    @FalseOnNull
-    static boolean isNotEmpty(@Nullable java.lang.CharSequence s) {
-      return s != null && s.length() > 0;
+    void testOK() {
+      String s = null;
+      if (whoknows()) {
+        s = "a";
+      }
+      else {
+        System.exit(1);
+      }
+      int n = s.length();
     }
   }
 
-  class TestTextUtilsIsEmpty {
-    void textUtilsNotIsEmpty(@Nullable CharSequence s) {
-      if (!TextUtils.isEmpty(s)) {
-        s.toString(); // OK
-      }
-    }
+  public void testMapGetBad
+      (Map<String, String> m,
+       HashMap<String, String> hm,
+       ConcurrentHashMap<String, String> chm) {
+      m.get("foo").toString();
+      hm.get("foo").toString();
+      chm.get("foo").toString();
+  }
 
-    void textUtilsIsEmpty(@Nullable CharSequence s) {
-      if (TextUtils.isEmpty(s)) {
-        s.toString(); // BAD
-      }
-    }
+  public void testMapRemoveBad
+      (Map<String, String> m,
+       HashMap<String, String> hm,
+       ConcurrentHashMap<String, String> chm) {
+      m.remove("foo").toString();
+      hm.remove("foo").toString();
+      chm.remove("foo").toString();
+  }
 
-    void myTextUtilsNotIsEmpty(@Nullable CharSequence s) {
-      if (!MyTextUtils.isEmpty(s)) {
-        s.toString(); // OK
-      }
-    }
+  @Nullable Object nullableField;
 
-    void myTextUtilsIsEmpty(@Nullable CharSequence s) {
-      if (MyTextUtils.isEmpty(s)) {
-        s.toString(); // BAD
-      }
-    }
-    void myTextUtilsIsNotEmpty(@Nullable CharSequence s) {
-      if (MyTextUtils.isNotEmpty(s)) {
-        s.toString(); // OK
-      }
-    }
-
-    void myTextUtilsNotIsNotEmpty(@Nullable CharSequence s) {
-      if (!MyTextUtils.isNotEmpty(s)) {
-        s.toString(); // BAD
-      }
+  void FP_propagatesNonNullAfterComparisonFieldOkay(Object nonNullObject) {
+    if (nullableField == nonNullObject) {
+      nullableField.toString();
     }
   }
+
+  void FP_propagatesNonNullAfterComparisonParameterOkay(
+      @Nullable Object nullableParameter, Object nonNullParameter) {
+    if (nullableParameter == nonNullParameter) {
+      nullableParameter.toString();
+    }
+  }
+
+  String customPreconditionsCheckNotNullOkay() {
+    MyPreconditions.checkNotNull(nullableField);
+    return nullableField.toString();
+  }
+
+  void nullMethodCallWithAlarmManager(
+      AlarmManager manager, @Nullable PendingIntent intent) {
+    manager.cancel(intent);
+  }
+
 }

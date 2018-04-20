@@ -8,39 +8,40 @@
 ROOT_DIR = ../../..
 include $(ROOT_DIR)/Makefile.config
 
-ANDROID_JAR = $(LIB_DIR)/java/android/android-19.jar
-JACKSON_JAR = $(DEPENDENCIES_DIR)/java/jackson/jackson-2.2.3.jar
-INFER_ANNOTATIONS_JAR = $(ANNOTATIONS_DIR)/annotations.jar
-
 MODELS_OUT = models
-INFER_REPORT = $(MODELS_OUT)/infer/report.json
+INFER_RESULTS_DIR = $(MODELS_OUT)/infer
+INFER_REPORT = $(INFER_RESULTS_DIR)/report.json
 MODELS_JAR = models.jar
-DEPLOYED_MODELS_JAR = $(LIB_DIR)/java/models.jar
 
-JAVA_BUILTINS_SOURCES = $(shell find builtins -name "*.java")
-JAVA_MODELS_SOURCES = $(shell find src -name "*.java")
+JAVA_SOURCES = $(shell find $(JAVA_BUILTINS_DIR) $(JAVA_MODELS_DIR) -name "*.java")
 
-JAVA_SOURCES = $(JAVA_BUILTINS_SOURCES) $(JAVA_MODELS_SOURCES)
+MODELS_CLASSPATH = $(ANDROID_JAR):$(GUAVA_JAR):$(JACKSON_JAR):$(JSR_305_JAR):$(INFER_ANNOTATIONS_JAR)
 
 all: $(MODELS_JAR)
 
 clean:
-	@rm -fr $(MODELS_OUT)
-	@rm -f $(MODELS_JAR)
-	@rm -f $(DEPLOYED_MODELS_JAR)
+	$(QUIET)rm -fr $(MODELS_OUT)
+	$(QUIET)rm -f $(MODELS_JAR)
+	$(QUIET)rm -f $(JAVA_MODELS_JAR)
 
-$(INFER_REPORT): $(ANDROID_JAR) $(JACKSON_JAR) $(JAVA_DEPS) $(INFER_ANNOTATIONS_JAR) $(JAVA_SOURCES)
-	@rm -fr $(MODELS_OUT)
-	mkdir -p $(MODELS_OUT)
-	@rm -f $(DEPLOYED_MODELS_JAR)
-	$(INFER_BIN) --jobs 1 --buck --models-mode -- javac -bootclasspath $(ANDROID_JAR) -d $(MODELS_OUT) -classpath $(JACKSON_JAR):$(INFER_ANNOTATIONS_JAR) $(JAVA_SOURCES)
+compile:
+	$(JAVAC) -bootclasspath $(ANDROID_JAR) -d $(MODELS_OUT) -classpath $(MODELS_CLASSPATH) $(JAVA_SOURCES)
+
+$(INFER_REPORT): $(JAVA_DEPS_NO_MODELS) $(JAVA_SOURCES) $(MAKEFILE_LIST)
+	$(QUIET)rm -fr $(MODELS_OUT)
+	$(QUIET)$(MKDIR_P) $(MODELS_OUT)
+	$(QUIET)rm -f $(JAVA_MODELS_JAR)
+	$(QUIET)$(call silent_on_success,Building Java models,\
+	  $(INFER_BIN) -a checkers --biabduction-only --results-dir $(INFER_RESULTS_DIR) --models-mode -- \
+	  $(JAVAC) -bootclasspath $(ANDROID_JAR) -d $(MODELS_OUT) -classpath $(MODELS_CLASSPATH) \
+	    $(JAVA_SOURCES) -source 7 -target 7)
 
 $(MODELS_JAR): $(INFER_REPORT)
 	cd $(MODELS_OUT); jar cf ../$(MODELS_JAR) *
 
-$(DEPLOYED_MODELS_JAR): $(MODELS_JAR)
-	$(INSTALL_DATA) -C $(MODELS_JAR) $(DEPLOYED_MODELS_JAR)
+$(JAVA_MODELS_JAR): $(MODELS_JAR)
+	$(INSTALL_DATA) -C $(MODELS_JAR) $(JAVA_MODELS_JAR)
 
-install: $(DEPLOYED_MODELS_JAR)
+install: $(JAVA_MODELS_JAR)
 
 .PHONY: all clean install

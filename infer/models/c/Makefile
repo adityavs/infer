@@ -8,22 +8,25 @@
 ROOT_DIR = ../../..
 include $(ROOT_DIR)/Makefile.config
 
-C_MODELS_FILE = $(SPECS_LIB_DIR)/c_models
-C_MODELS_SOURCES = $(shell find src/ -name "*.c")
+C_MODELS_SOURCES = $(shell find src/ -name "*.[ch]")
+INFER_RESULTS = out/report.json
 
-all: $(C_MODELS_FILE)
+all: install
 
-$(C_MODELS_FILE): $(C_MODELS_SOURCES) $(CLANG_DEPS)
-# make clean in src/ in case $(CLANG_DEPS) have changed
-	$(MAKE) -C src clean
-	$(INFER_BIN) -o out/ --models-mode --no-failures-allowed -- $(MAKE) -C src
-	touch $(C_MODELS_FILE)
+$(INFER_RESULTS): $(C_MODELS_SOURCES) $(CLANG_DEPS_NO_MODELS) $(MAKEFILE_LIST)
+#	make clean in src/ to recompile all the models
+	$(QUIET)$(call silent_on_success,Building C models,\
+	  $(INFER_BIN) -a checkers --biabduction-only -o $(@D) --models-mode -- $(MAKE) -C src clean all)
+
+$(C_MODELS_FILE): $(INFER_RESULTS)
+	$(QUIET)$(INSTALL_DATA) $(dir $(INFER_RESULTS))/specs/*.specs $(SPECS_LIB_DIR)
+	$(QUIET)touch $@
 
 install: $(C_MODELS_FILE)
-	$(INSTALL_DATA) -C out/specs/*.specs $(SPECS_LIB_DIR)
 
 clean:
-	@rm -f $(C_MODELS_FILE)
-	$(MAKE) -C src clean
+	$(REMOVE) $(C_MODELS_FILE)
+	$(REMOVE_DIR) $(dir $(INFER_RESULTS))
+	$(QUIET)$(MAKE) -C src clean
 
 .PHONY: all clean install

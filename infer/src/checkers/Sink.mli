@@ -9,22 +9,21 @@
 
 open! IStd
 
-type 'a parameter =
-  { sink : 'a;
-    (** sink type of the parameter *)
-    index : int;
-    (** index of the parameter *)
-    report_reachable : bool;
-    (** if true, report if *any* value heap-reachable from the sink parameter is a source.
-        if false, report only if the value passed to the sink is itself a source *)
-  }
+module type Kind = sig
+  include TraceElem.Kind
 
-val make_sink_param : 'a -> int -> report_reachable:bool -> 'a parameter
-
+  val get : Typ.Procname.t -> HilExp.t list -> CallFlags.t -> Tenv.t -> (t * IntSet.t) option
+  (** return Some kind if the given procname/actuals are a sink, None otherwise *)
+end
 
 module type S = sig
   include TraceElem.S
 
-  (** return the parameter index and sink kind for the given call site with the given actuals *)
-  val get : CallSite.t -> (Exp.t * Typ.t) list -> t parameter list
+  val get : CallSite.t -> HilExp.t list -> CallFlags.t -> Tenv.t -> t option
+  (** return Some sink if the given call site/actuals are a sink, None otherwise *)
+
+  val indexes : t -> IntSet.t
+  (** return the indexes where taint can flow into the sink *)
 end
+
+module Make (Kind : Kind) : S with module Kind = Kind

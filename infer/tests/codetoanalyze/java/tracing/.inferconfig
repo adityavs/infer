@@ -1,5 +1,6 @@
 {
-  "never_returning_null": [
+  "force-delete-results-dir": true,
+  "never-returning-null": [
     {
       "language": "Java",
       "source_contains": "_AUTOMATICALLY_GENERATED_"
@@ -10,10 +11,10 @@
       "method": "get"
     }
   ],
-  "infer-blacklist-files-containing": [
+  "checkers-blacklist-files-containing": [
     "@generated"
   ],
-  "skip_translation": [
+  "skip-translation": [
     {
       "language": "Java",
       "source_contains": "_SHOULD_BE_SKIPPED_"

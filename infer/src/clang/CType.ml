@@ -11,82 +11,66 @@ open! IStd
 
 (** Utility module for retrieving types *)
 
-open CFrontend_utils
 module L = Logging
 
-let add_pointer_to_typ typ =
-  Typ.Tptr(typ, Typ.Pk_pointer)
+let add_pointer_to_typ typ = Typ.mk (Tptr (typ, Typ.Pk_pointer))
 
-let remove_pointer_to_typ typ =
-  match typ with
-  | Typ.Tptr(typ, Typ.Pk_pointer) -> typ
-  | _ -> typ
-
-let classname_of_type typ =
-  match typ with
-  | Typ.Tstruct name -> Typename.name name
-  | Typ.Tfun _ -> CFrontend_config.objc_object
+let objc_classname_of_type typ =
+  match typ.Typ.desc with
+  | Typ.Tstruct name ->
+      name
+  | Typ.Tfun _ ->
+      Typ.Name.Objc.from_string CFrontend_config.objc_object
   | _ ->
-      Logging.out_debug
-        "Classname of type cannot be extracted in type %s" (Typ.to_string typ);
-      "undefined"
+      L.(debug Capture Verbose)
+        "Classname of type cannot be extracted in type %s" (Typ.to_string typ) ;
+      Typ.Name.Objc.from_string "undefined"
 
-let mk_classname n ck = Typename.TN_csu (Csu.Class ck, Mangled.from_string n)
-
-let mk_structname n = Typename.TN_csu (Csu.Struct, Mangled.from_string n)
 
 let is_class typ =
-  match typ with
-  | Typ.Tptr (Tstruct ((TN_csu _) as name), _) ->
-      String.equal (Typename.name name) CFrontend_config.objc_class
-  | _ -> false
+  match typ.Typ.desc with
+  | Typ.Tptr ({desc= Tstruct name}, _) ->
+      String.equal (Typ.Name.name name) CFrontend_config.objc_class
+  | _ ->
+      false
 
-let rec return_type_of_function_type_ptr type_ptr =
+
+let rec return_type_of_function_qual_type (qual_type: Clang_ast_t.qual_type) =
   let open Clang_ast_t in
-  match Ast_utils.get_type type_ptr with
-  | Some FunctionProtoType (_, function_type_info, _)
-  | Some FunctionNoProtoType (_, function_type_info) ->
+  match CAst_utils.get_type qual_type.qt_type_ptr with
+  | Some (FunctionProtoType (_, function_type_info, _))
+  | Some (FunctionNoProtoType (_, function_type_info)) ->
       function_type_info.Clang_ast_t.fti_return_type
-  | Some BlockPointerType (_, in_type_ptr) ->
-      return_type_of_function_type_ptr in_type_ptr
+  | Some (BlockPointerType (_, in_qual)) ->
+      return_type_of_function_qual_type in_qual
   | Some _ ->
-      Logging.err_debug "Warning: Type pointer %s is not a function type."
-        (Clang_ast_types.type_ptr_to_string type_ptr);
-      `ErrorType
+      L.(debug Capture Verbose)
+        "Warning: Type pointer %s is not a function type."
+        (Clang_ast_extend.type_ptr_to_string qual_type.qt_type_ptr) ;
+      {qual_type with qt_type_ptr= Clang_ast_extend.ErrorType}
   | None ->
-      Logging.err_debug "Warning: Type pointer %s not found."
-        (Clang_ast_types.type_ptr_to_string type_ptr);
-      `ErrorType
+      L.(debug Capture Verbose)
+        "Warning: Type pointer %s not found."
+        (Clang_ast_extend.type_ptr_to_string qual_type.qt_type_ptr) ;
+      {qual_type with qt_type_ptr= Clang_ast_extend.ErrorType}
 
-let return_type_of_function_type tp =
-  return_type_of_function_type_ptr tp
 
-let is_block_type tp =
+let return_type_of_function_type qual_type = return_type_of_function_qual_type qual_type
+
+let is_block_type {Clang_ast_t.qt_type_ptr} =
   let open Clang_ast_t in
-  match Ast_utils.get_desugared_type tp with
-  | Some BlockPointerType _ -> true
-  | _ -> false
+  match CAst_utils.get_desugared_type qt_type_ptr with
+  | Some (BlockPointerType _) ->
+      true
+  | _ ->
+      false
 
-let is_reference_type tp =
-  match Ast_utils.get_desugared_type tp with
-  | Some Clang_ast_t.LValueReferenceType _ -> true
-  | Some Clang_ast_t.RValueReferenceType _ -> true
-  | _ -> false
 
-(* To be called with strings of format "<pointer_type_info>*<class_name>" *)
-let get_name_from_type_pointer custom_type_pointer =
-  match Str.split (Str.regexp "*") custom_type_pointer with
-  | [pointer_type_info; class_name] -> pointer_type_info, class_name
-  | _ -> assert false
-
-(*
-let rec get_type_list nn ll =
-  match ll with
-  | [] -> []
-  | (n, t):: ll' -> (* Logging.out_debug ">>>>>Searching for type '%s'. Seen '%s'.@." nn n; *)
-      if n = nn then (
-        Logging.out_debug ">>>>>>>>>>>>>>>>>>>>>>>NOW Found, Its type is: '%s'@."
-          (Typ.to_string t);
-        [t]
-      ) else get_type_list nn ll'
-*)
+let is_reference_type {Clang_ast_t.qt_type_ptr} =
+  match CAst_utils.get_desugared_type qt_type_ptr with
+  | Some (Clang_ast_t.LValueReferenceType _) ->
+      true
+  | Some (Clang_ast_t.RValueReferenceType _) ->
+      true
+  | _ ->
+      false

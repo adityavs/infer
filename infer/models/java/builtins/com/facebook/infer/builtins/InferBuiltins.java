@@ -16,11 +16,7 @@ public class InferBuiltins {
 
     public native static void __set_mem_attribute(Object o);
 
-    public native static void __set_lock_attribute(Object o);
-
     public native static void __set_locked_attribute(Object o);
-
-    public native static void __set_unlocked_attribute(Object o);
 
     public native static void __delete_locked_attribute(Object o);
 
@@ -39,12 +35,5 @@ public class InferBuiltins {
     }
 
     public native static String __split_get_nth(String s, String sep, int n);
-
-    public native static void __set_taint_attribute(Object o, String taintKind);
-
-    public native static void __set_untaint_attribute(Object o);
-
-    // report an error if o is tainted, then assume UNTAINT(o) going forward
-    public native static void __check_untainted(Object o);
 
 }

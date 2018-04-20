@@ -5,26 +5,30 @@
 # LICENSE file in the root directory of this source tree. An additional grant
 # of patent rights can be found in the PATENTS file in the same directory.
 
-CURDIR = $(shell pwd)
-
 TESTS_DIR = ../..
 ROOT_DIR = $(TESTS_DIR)/../..
 
-ANALYZER = infer
+ANALYZER = checkers
+BUCK_TARGET = //infer/tests/build_systems/genrule/module2:module2
 SOURCES = $(wildcard $(TESTS_DIR)/codetoanalyze/java/infer/*.java)
-OBJECTS = $(ROOT_DIR)/buck-out/gen/infer/tests/codetoanalyze/java/infer/lib__compile__output/compile.jar
+OBJECTS = $(ROOT_DIR)/buck-out/gen/infer/tests/build_systems/genrule/module2/lib__module2__output/module2.jar
+INFER_OPTIONS = --eradicate
 INFERPRINT_OPTIONS = --project-root $(ROOT_DIR) --issues-tests
-CLEAN_EXTRA = $(ROOT_DIR)/buck-out/ $(CURDIR)/buck-out/
+CLEAN_EXTRA = $(ROOT_DIR)/buck-out
 
 include $(TESTS_DIR)/java.make
-include $(TESTS_DIR)/base.make
+include $(TESTS_DIR)/infer.make
 
-$(JAR_OUTPUT): $(JAVA_SOURCE_FILES)
-	cd $(ROOT_DIR) && $(call silent_on_success, INFER_BIN=$(INFER_BIN) NO_BUCKD=1 buck build --no-cache //infer/tests/codetoanalyze/java/infer:compile)
+$(OBJECTS): $(JAVA_SOURCE_FILES)
+	$(QUIET)cd $(ROOT_DIR) && \
+	$(call silent_on_success,Compiling Buck Java tests,\
+	INFER_BIN=$(INFER_BIN) \
+	$(BUCK) build --deep --no-cache $(BUCK_TARGET))
 
-.PHONY: genrule
-genrule: $(JAR_OUTPUT)
-	cd $(ROOT_DIR) && $(call silent_on_success, INFER_BIN=$(INFER_BIN) NO_BUCKD=1 GENERATE_INFER_GENRULES=1 buck build --no-cache //infer/tests/build_systems/genrule/module2:module2_infer)
-
-infer-out/report.json: genrule $(INFER_BIN) $(JAVA_SOURCE_FILES)
-	cd $(ROOT_DIR) && $(call silent_on_success, INFER_BIN=$(INFER_BIN) NO_BUCKD=1 $(INFER_BIN) -a $(ANALYZER) --results-dir $(CURDIR)/infer-out  -- buck build --no-cache //infer/tests/codetoanalyze/java/infer:compile)
+infer-out/report.json: $(JAVA_DEPS) $(JAVA_SOURCE_FILES)
+	$(QUIET)cd $(ROOT_DIR) && \
+	$(REMOVE_DIR) buck-out && \
+	$(call silent_on_success,Testing Buck Java integration,\
+	INFER_BIN=$(INFER_BIN) \
+	$(INFER_BIN) $(INFER_OPTIONS) -a $(ANALYZER) --results-dir $(CURDIR)/infer-out -- \
+	  $(BUCK) build --deep --no-cache $(BUCK_TARGET))

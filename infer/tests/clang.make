@@ -7,24 +7,16 @@
 
 ROOT_DIR = $(TESTS_DIR)/../..
 
-OBJECTS = $(foreach source,$(SOURCES),$(basename $(source)).o)
 CLEAN_EXTRA += duplicates.txt
 
-include $(TESTS_DIR)/base.make
+OBJECTS = $(foreach source,$(filter %.c %.cpp %.m %.mm,$(SOURCES)),$(basename $(source)).o)
 
-infer-out/report.json: $(CLANG_DEPS) $(SOURCES) $(HEADERS)
-	$(call silent_on_success,\
-	  $(INFER_BIN) --check-duplicate-symbols $(INFER_OPTIONS) -a $(ANALYZER) -- clang $(CLANG_OPTIONS) $(SOURCES) 2>duplicates.txt)
-	grep "DUPLICATE_SYMBOLS" duplicates.txt; test $$? -ne 0
+include $(TESTS_DIR)/infer.make
+include $(TESTS_DIR)/clang-base.make
 
-%.o: %.c
-	clang $(CLANG_OPTIONS) -o $@ $<
-
-%.o: %.cpp
-	clang++ $(CLANG_OPTIONS) -o $@ $<
-
-%.o: %.m
-	clang $(CLANG_OPTIONS) -o $@ $<
-
-%.o: %.mm
-	clang++ $(CLANG_OPTIONS) -o $@ $<
+infer-out$(TEST_SUFFIX)/report.json: $(CLANG_DEPS) $(SOURCES) $(HEADERS) $(TESTS_DIR)/.inferconfig $(MAKEFILE_LIST)
+	$(QUIET)$(call silent_on_success,Testing infer/clang$(ANALYZER_STRING) in $(TEST_REL_DIR),\
+	  $(INFER_BIN) --results-dir $(@D) --dump-duplicate-symbols \
+	    $(INFER_OPTIONS) -a $(ANALYZER) -- \
+	    clang $(CLANG_OPTIONS) $(SOURCES))
+	$(QUIET)$(call check_no_duplicates,infer-out$(TEST_SUFFIX)/duplicates.txt)

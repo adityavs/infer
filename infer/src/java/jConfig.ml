@@ -9,7 +9,6 @@
  *)
 
 open! IStd
-
 open Javalib_pack
 
 (** {2 Class names and types} *)
@@ -18,13 +17,7 @@ let builtins_package = "com.facebook.infer.builtins"
 
 let infer_builtins_cl = builtins_package ^ ".InferBuiltins"
 
-let infer_array_cl = builtins_package ^ ".InferArray"
-
-let infer_undefined_cl = builtins_package ^ ".InferUndefined"
-
-let obj_type = (JBasics.TObject (JBasics.TClass JBasics.java_lang_object))
-
-let bool_type = JBasics.TBasic `Bool
+let obj_type = JBasics.TObject (JBasics.TClass JBasics.java_lang_object)
 
 let string_cl = "java.lang.String"
 
@@ -35,30 +28,6 @@ let npe_cl = "java.lang.NullPointerException"
 let cce_cl = "java.lang.ClassCastException"
 
 let out_of_bound_cl = "java.lang.ArrayIndexOutOfBoundsException"
-
-let reentrant_lock_cl = "java.util.concurrent.locks.ReentrantLock"
-
-let lock_cl = "java.util.concurrent.locks.Lock"
-
-let reentrant_rwlock_cl = "java.util.concurrent.locks.ReentrantReadWriteLock"
-
-let reentrant_rlock_cl = reentrant_rwlock_cl^"$ReadLock"
-
-let reentrant_wlock_cl = reentrant_rwlock_cl^"$WriteLock"
-
-let thread_class = "java.lang.Thread"
-
-let runnable_if = "java.lang.Runnable"
-
-let lock_method = "lock"
-
-let unlock_method = "unlock"
-
-let try_lock_method = "tryLock"
-
-let start_method = "start"
-
-let run_method = "run"
 
 (** {2 Names of special variables, constants and method names} *)
 
@@ -110,22 +79,4 @@ let long_code = "J"
 
 let short_code = "S"
 
-let class_code cl = "L"^cl
-
-let errors_db_file = "errors.db"
-let main_errors_file = "Java_frontend.errors"
-
-(** {2 Flags } *)
-
-(* the Sawja representation of the Java Bytecode will be printed *)
-let html_mode = ref false
-
-(* The dynamic dispatch will be handled partially statically *)
-let static_dispatch = ref false
-
-(* counts the amount of initializer methods, in init-mode *)
-let init_count = ref 0
-
-let normalize_string s =
-  let rexp = Str.regexp_string "$" in
-  Str.global_replace rexp "_" s
+let class_code cl = "L" ^ cl

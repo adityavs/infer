@@ -8,15 +8,10 @@
 TESTS_DIR=../../..
 
 CLANG_OPTIONS = -c
+INFER_OPTIONS =
 
 SOURCES = \
   $(wildcard */*.c) \
   $(wildcard */*.cpp) \
 
 include $(TESTS_DIR)/clang-frontend.make
-
-compile:
-	clang $(CLANG_OPTIONS) $(SOURCES)
-
-capture:
-	$(INFER_BIN) -a capture --frontend-tests --cxx --project-root $(TESTS_DIR) -- clang $(CLANG_OPTIONS) $(SOURCES)

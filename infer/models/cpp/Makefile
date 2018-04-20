@@ -8,23 +8,27 @@
 ROOT_DIR = ../../..
 include $(ROOT_DIR)/Makefile.config
 
-CPP_MODELS_FILE = $(SPECS_LIB_DIR)/cpp_models
-CPP_MODELS_SOURCES = $(shell find src/ -name "*.cpp")
-C_MODELS_SOURCES = $(shell find src/c_src/ -name "*.c")
+MODELS_SOURCES = $(shell find src/ -name "*.cpp") \
+                 $(shell find src/c_src/ -name "*.[ch]") \
+                 $(shell find include -type f)
+INFER_RESULTS = out/report.json
 
-all: $(CPP_MODELS_FILE)
+all: install
 
-$(CPP_MODELS_FILE): $(CPP_MODELS_SOURCES) $(C_MODELS_SOURCES) $(CLANG_DEPS)
-# make clean in src/ in case $(CLANG_DEPS) have changed
-	$(MAKE) -C src clean
-	$(INFER_BIN) -o out/ --models-mode --no-failures-allowed --cxx -- $(MAKE) -C src
-	touch $(CPP_MODELS_FILE)
+$(INFER_RESULTS): $(MODELS_SOURCES) $(CLANG_DEPS_NO_MODELS) $(MAKEFILE_LIST)
+#	make clean in src/ to recompile all the models
+	$(QUIET)$(call silent_on_success,Building C++ models,\
+	  $(INFER_BIN) -a checkers --biabduction-only -o $(@D) --models-mode -- $(MAKE) -C src clean all)
+
+$(CPP_MODELS_FILE): $(INFER_RESULTS)
+	$(QUIET)$(INSTALL_DATA) $(dir $(INFER_RESULTS))/specs/*.specs $(SPECS_LIB_DIR)
+	$(QUIET)touch $@
 
 install: $(CPP_MODELS_FILE)
-	$(INSTALL_DATA) -C out/specs/*.specs $(SPECS_LIB_DIR)
 
 clean:
-	@rm -f $(CPP_MODELS_FILE)
-	$(MAKE) -C src clean
+	$(REMOVE) $(CPP_MODELS_FILE)
+	$(REMOVE_DIR) $(dir $(INFER_RESULTS))
+	$(QUIET)$(MAKE) -C src clean
 
 .PHONY: all clean install

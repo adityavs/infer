@@ -11,20 +11,16 @@ open! IStd
 
 type t
 
-type compilation_data = {
-  dir : string;
-  command : string;
-  args : string;
-}
+type compilation_data =
+  { directory: string
+  ; executable: string
+  ; escaped_arguments: string list
+        (** argument list, where each argument is already escaped for the shell. This is because in
+            some cases the argument list contains arguments that are actually themselves a list of
+            arguments, for instance because the compilation database only contains a "command"
+            entry. *)
+  }
 
-val empty : unit -> t
+val filter_compilation_data : t -> f:(SourceFile.t -> bool) -> compilation_data list
 
-val get_size : t -> int
-
-val iter : t -> (SourceFile.t -> compilation_data -> unit) -> unit
-
-val find : t -> SourceFile.t -> compilation_data
-
-val decode_json_file : t -> string -> unit
-
-val from_json_files : string list -> t
+val from_json_files : [< `Escaped of string | `Raw of string] list -> t

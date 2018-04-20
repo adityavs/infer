@@ -239,6 +239,59 @@ class Interprocedural {
     InferTaint.inferSensitiveSink(o.f);
   }
 
+  static Object relevantPassthrough(Object param) {
+    return param;
+  }
+
+  static Object irrelevantPassthrough(Object param) {
+    return param;
+  }
+
+  // the following tests should show only "relevantPassthrough" in their traces
+  public static Object irrelevantPassthroughsIntraprocedural(Object param) {
+    Object irrelevant = irrelevantPassthrough(param);
+    Object source = InferTaint.inferSecretSource();
+    Object relevant = relevantPassthrough(source);
+    InferTaint.inferSensitiveSink(relevant);
+    return irrelevantPassthrough(relevant);
+  }
+
+  public static Object returnSourceIrrelevantPassthrough(Object param) {
+    Object irrelevant = irrelevantPassthrough(param);
+    Object source = InferTaint.inferSecretSource();
+    return relevantPassthrough(source);
+  }
+
+  public static Object irrelevantPassthroughsSourceInterprocedural(Object o) {
+    Object irrelevant = irrelevantPassthrough(o);
+    Object source = returnSourceIrrelevantPassthrough(irrelevant);
+    Object relevant = relevantPassthrough(source);
+    InferTaint.inferSensitiveSink(relevant);
+    return irrelevantPassthrough(source);
+  }
+
+  public static Object callSinkIrrelevantPassthrough(Object param) {
+    Object relevant = relevantPassthrough(param);
+    InferTaint.inferSensitiveSink(relevant);
+    Object irrelevant = irrelevantPassthrough(param);
+    return irrelevant;
+  }
+
+  public static Object irrelevantPassthroughsSinkInterprocedural(Object o) {
+    Object source = InferTaint.inferSecretSource();
+    Object relevant = relevantPassthrough(source);
+    callSinkIrrelevantPassthrough(relevant);
+    return irrelevantPassthrough(relevant);
+  }
+
+  public static Object irrelevantPassthroughsSourceAndSinkInterprocedural(Object o) {
+    Object irrelevant = irrelevantPassthrough(o);
+    Object source = returnSourceIrrelevantPassthrough(irrelevant);
+    Object relevant = relevantPassthrough(source);
+    callSinkIrrelevantPassthrough(relevant);
+    return irrelevantPassthrough(relevant);
+  }
+
   /** false negatives: an ideal analysis would report on these, but we do not */
 
   // this gets modeled as Object[] params in Java. need to treat the array is tainted if its
@@ -273,19 +326,93 @@ class Interprocedural {
     callSinkThenDiverge(InferTaint.inferSecretSource());
   }
 
-  public static void assignSourceToParam(Object o) {
-    o = InferTaint.inferSecretSource();
+  public void callSinkOnParam(Object o) {
+    InferTaint.inferSensitiveSink(o);
   }
 
-  // Java is call-by-value; this is fine
-  public static void assignSourceToParamOk() {
-    Object o = null;
-    assignSourceToParam(o);
-    InferTaint.inferSensitiveSink(o);
+  public void callSinkIndirectOnParam(Object o) {
+    callSinkOnParam(o);
+  }
+
+  Obj propagate(Object param) {
+    Obj o = new Obj();
+    o.f = param;
+    return o;
+  }
+
+  static Obj id2(Obj o) {
+    return o;
+  }
+
+  void callSinkA(Obj o) {
+    callSink1(o);
+  }
+
+  void callSinkB(Obj o) {
+    callSink2(o);
+  }
+
+  void callSinkC(Obj o) {
+    callSink3(o);
+  }
+
+  void callSinkD(Obj o) {
+    callSink4(o);
+  }
+
+  void callSink1(Obj o) {
+    InferTaint.inferSensitiveSink(id(o));
+  }
+
+  void callSink2(Obj o) {
+    InferTaint.inferSensitiveSink(id2(o).f);
+  }
+
+  void callSink3(Obj o) {
+    InferTaint.inferSensitiveSink(id(o.f));
+  }
+
+  void callSink4(Obj o) {
+    InferTaint.inferSensitiveSink(o.f);
+  }
+
+  public void callDeepSinkIndirectBad() {
+    Object source = InferTaint.inferSecretSource();
+    callSinkIndirectOnParam(source);
+  }
+
+  public void callDeepSink1Bad() {
+    Obj source = propagate(InferTaint.inferSecretSource());
+    callSinkA(source);
+  }
+
+  public void FN_callDeepSink2Bad() {
+    Obj source = propagate(InferTaint.inferSecretSource());
+    callSinkB(source);
+  }
+
+  // shallow version of callSinkDeep2Bad
+  void FN_callShallowSinkBad(Obj o) {
+    o.f = InferTaint.inferSecretSource();
+    InferTaint.inferSensitiveSink(id2(o).f);
+  }
+
+  public void callDeepSink3Bad() {
+    Obj source = propagate(InferTaint.inferSecretSource());
+    callSinkC(source);
+  }
+
+  public void callDeepSink4Bad() {
+    Obj source = propagate(InferTaint.inferSecretSource());
+    callSinkD(source);
   }
 
   public static void swapParams(Object o1, Object o2) {
     o1 = o2;
+  }
+
+  public static void assignSourceToParam(Object o) {
+    o = InferTaint.inferSecretSource();
   }
 
   public static void swapParamsOk() {
@@ -293,6 +420,12 @@ class Interprocedural {
     Object source = InferTaint.inferSecretSource();
     swapParams(notASource, source);
     InferTaint.inferSensitiveSink(notASource);
+  }
+
+  public static void assignSourceToParamOk() {
+    Object o = null;
+    assignSourceToParam(o);
+    InferTaint.inferSensitiveSink(o);
   }
 
 }

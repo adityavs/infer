@@ -8,6 +8,8 @@
  *)
 
 {
+  open! IStd
+
   open Lexing
   open Ctl_parser
 
@@ -25,6 +27,7 @@
 let comment = "//" [^'\n']*
 let whitespace = [' ' '\t']
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_' ':']*
+let file_id = ['a'-'z' 'A'-'Z' '_' '~' '/' '.'] ['a'-'z' 'A'-'Z' '0'-'9' '_' ':' '.' '/' '-']*
 
 rule token = parse
   | whitespace+ { token lexbuf }
@@ -33,22 +36,26 @@ rule token = parse
   | "HOLDS-UNTIL" { EU }
   | "HOLDS-EVERYWHERE-UNTIL" { AU }
   | "HOLDS-EVENTUALLY" { EF }
-  | "HOLDS-EVENTUALLY-EVERYWHERE" { AF }
+  | "HOLDS-EVERYWHERE-EVENTUALLY" { AF }
   | "HOLDS-NEXT" { EX }
   | "HOLDS-EVERYWHERE-NEXT" { AX }
-  | "ALWAYS-HOLDS" { EG }
-  | "ALSWAYS-HOLDS-EVERYWHERE" { AG }
-  | "INSTANCEOF" { EH }
+  | "HOLDS-ALWAYS" { EG }
+  | "HOLDS-EVERYWHERE-ALWAYS" { AG }
+  | "HOLDS-IN-SOME-SUPERCLASS-OF" { EH }
   | "IN-NODE" { ET }
-  | "IN-EXCLUSIVE-NODE" { ETX }
   | "WHEN" { WHEN }
   | "HOLDS-IN-NODE" { HOLDS_IN_NODE }
   | "WITH-TRANSITION" {WITH_TRANSITION}
   | "DEFINE-CHECKER" { DEFINE_CHECKER }
+  | "GLOBAL-MACROS" { GLOBAL_MACROS }
+  | "GLOBAL-PATHS" { GLOBAL_PATHS }
+  | "#IMPORT" { HASHIMPORT }
   | "SET" { SET }
   | "LET" { LET }
   | "TRUE" { TRUE }
   | "FALSE" { FALSE }
+  | "whitelist_path" { WHITELIST_PATH }
+  | "blacklist_path" { BLACKLIST_PATH }
   | "{" { LEFT_BRACE }
   | "}" { RIGHT_BRACE }
   | "(" { LEFT_PAREN }
@@ -60,6 +67,19 @@ rule token = parse
   | "OR" { OR }
   | "NOT" { NOT }
   | "IMPLIES" { IMPLIES }
+  | "REGEXP" { REGEXP }
+  | "AccessorForProperty" { ACCESSOR_FOR_PROPERTY }
+  | "Any" {ANY}
+  | "Fields" { FIELDS }
+  | "FieldName" { FIELD_NAME }
+  | "Parameters" { PARAMETERS }
+  | "ParameterName" { PARAMETER_NAME }
+  | "ParameterPos" { PARAMETER_POS }
+  | "Body" {BODY}
+  | "Protocol" {PROTOCOL}
+  | "InitExpr" {INIT_EXPR}
+  | "Cond" {COND}
+  | "PointerToDecl" {POINTER_TO_DECL}
   | id { IDENTIFIER (Lexing.lexeme lexbuf) }
   | '"' { read_string (Buffer.create 80) lexbuf }
   | _ { raise (SyntaxError ("Unexpected char: '" ^ (Lexing.lexeme lexbuf) ^"'")) }

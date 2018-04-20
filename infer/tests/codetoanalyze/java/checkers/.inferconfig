@@ -1,5 +1,6 @@
 {
-  "modeled_expensive": [
+  "force-delete-results-dir": true,
+  "modeled-expensive": [
     {
       "language": "Java",
       "class": "android.app.Activity",
@@ -10,5 +11,14 @@
       "class": "android.view.View",
       "method": "findViewById"
     }
+  ],
+  "annotation-reachability-custom-pairs": [
+    {
+       "sources": ["UserDefinedSource1", "UserDefinedSource2"],
+       "sink": "UserDefinedSink"
+    }
+  ],
+  "external-java-packages": [
+    "external."
   ]
 }

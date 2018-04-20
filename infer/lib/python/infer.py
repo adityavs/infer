@@ -22,7 +22,6 @@ import sys
 
 import inferlib
 from inferlib import analyze, config, utils
-from inferlib.capture import make
 
 CAPTURE_PACKAGE = 'capture'
 
@@ -35,16 +34,10 @@ CMD_MARKER = '--'
 # All supported commands should be listed here
 MODULE_TO_COMMAND = {
     'ant': ['ant'],
-    'analyze': ['analyze'],
     'buck': ['buck'],
     'gradle': ['gradle', 'gradlew'],
-    'javac': ['javac'],
-    'java': ['java'],
-    'make': make.SUPPORTED_COMMANDS,
     'xcodebuild': ['xcodebuild'],
-    'mvn': ['mvn'],
     'ndk-build': ['ndk-build'],
-    'clang-compilation-database': ['clang-compilation-database'],
 }
 
 
@@ -144,18 +137,7 @@ def main():
 
     args = global_argparser.parse_args(to_parse)
 
-    remove_infer_out = (imported_module is not None and
-                        not args.reactive and
-                        capture_module_name != 'analyze' and
-                        not args.buck)
-    if remove_infer_out:
-        analyze.remove_infer_out(args.infer_out)
-
     if imported_module is not None:
-        analyze.create_results_dir(args.infer_out)
-        analyze.reset_start_file(args.infer_out,
-                                 touch_if_present=not args.continue_capture)
-
         utils.configure_logging(args)
         try:
             logging.info('output of locale.getdefaultlocale(): %s',
@@ -190,7 +172,7 @@ def main():
         logging.info('Capture phase was successful')
     elif capture_module_name is not None:
         # There was a command, but it's not supported
-        utils.stdout('Command "{cmd}" not recognised'
+        utils.stderr('Command "{cmd}" not recognised'
                      .format(cmd='' if capture_module_name is None
                              else capture_module_name))
         global_argparser.print_help()
@@ -198,6 +180,7 @@ def main():
     else:
         global_argparser.print_help()
         sys.exit(os.EX_OK)
+
 
 if __name__ == '__main__':
     main()

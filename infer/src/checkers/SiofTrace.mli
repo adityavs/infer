@@ -9,15 +9,12 @@
 
 open! IStd
 
-module Global :
-sig
-  type t = Pvar.t
-  val compare : t -> t -> int
-  val pp : Format.formatter -> t -> unit
-end
+include SinkTrace.S with type Sink.Kind.t = Pvar.t
 
-include SinkTrace.S with module Sink.Kind = Global
+module GlobalVar : PrettyPrintable.PrintableOrderedType with type t = Pvar.t
 
-val make_access : Global.t -> Location.t -> Sink.t
+module GlobalVarSet : PrettyPrintable.PPSet with type elt = Pvar.t
 
-val is_intraprocedural_access : Sink.t -> bool
+val make_access : Pvar.t -> Location.t -> Sink.t
+
+val trace_of_error : Location.t -> string -> sink_path -> Errlog.loc_trace_elem list

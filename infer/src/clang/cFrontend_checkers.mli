@@ -9,51 +9,26 @@
 
 open! IStd
 
-(* === Warnings on properties === *)
+val location_from_stmt : CLintersContext.context -> Clang_ast_t.stmt -> Location.t
 
-(* Strong Delegate Warning: a property with name delegate should not be declared strong *)
-val ctl_strong_delegate_warning :
-  CLintersContext.context -> CTL.ast_node -> CTL.t * CIssue.issue_desc option
+val location_from_dinfo : CLintersContext.context -> Clang_ast_t.decl_info -> Location.t
 
-(* Assing Pointer Warning: a property with a pointer type should not be declared `assign` *)
-val ctl_assign_pointer_warning :
-  CLintersContext.context -> CTL.ast_node -> CTL.t * CIssue.issue_desc option
+val location_from_an : CLintersContext.context -> Ctl_parser_types.ast_node -> Location.t
 
-(* Direct Atomic Property access:
-   a property declared atomic should not be accesses directly via its iva *)
-val ctl_direct_atomic_property_access_warning :
-  CLintersContext.context -> CTL.ast_node -> CTL.t * CIssue.issue_desc option
+val location_from_decl : CLintersContext.context -> Clang_ast_t.decl -> Location.t
 
-(* CXX_REFERENCE_CAPTURED_IN_OBJC_BLOCK: C++ references
-   should not be captured in blocks.  *)
-val ctl_captured_cxx_ref_in_objc_block_warning :
-  CLintersContext.context -> CTL.ast_node -> CTL.t * CIssue.issue_desc option
+val ivar_name : Ctl_parser_types.ast_node -> string
 
-val ctl_bad_pointer_comparison_warning :
-  CLintersContext.context -> CTL.ast_node -> CTL.t * CIssue.issue_desc option
+val cxx_ref_captured_in_block : Ctl_parser_types.ast_node -> string
 
-(* REGISTERED_OBSERVER_BEING_DEALLOCATED: an object is registered in a notification center
-   but not removed before deallocation *)
-val ctl_ns_notification_warning :
-  CLintersContext.context -> CTL.ast_node -> CTL.t * CIssue.issue_desc option
+val decl_ref_or_selector_name : Ctl_parser_types.ast_node -> string
 
-(* GLOBAL_VARIABLE_INITIALIZED_WITH_FUNCTION_OR_METHOD_CALL warning: a global variable initialization should not *)
-(* contain calls to functions or methods as these can be expensive an delay the starting time *)
-(* of a program *)
-val ctl_global_var_init_with_calls_warning :
-  CLintersContext.context -> CTL.ast_node -> CTL.t * CIssue.issue_desc option
+val iphoneos_target_sdk_version : CLintersContext.context -> Ctl_parser_types.ast_node -> string
 
-val location_from_stmt :
-  CLintersContext.context -> Clang_ast_t.stmt -> Location.t
+val available_ios_sdk : Ctl_parser_types.ast_node -> string
 
-val location_from_dinfo :
-  CLintersContext.context -> Clang_ast_t.decl_info -> Location.t
+val class_available_ios_sdk : Ctl_parser_types.ast_node -> string
 
-val location_from_decl :
-  CLintersContext.context -> Clang_ast_t.decl -> Location.t
+val receiver_method_call : Ctl_parser_types.ast_node -> string
 
-val decl_name_from_an : CTL.ast_node -> string
-
-val ivar_name : CTL.ast_node -> string
-
-val var_descs_name : CTL.ast_node -> string
+val class_name : Ctl_parser_types.ast_node -> string

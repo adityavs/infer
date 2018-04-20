@@ -8,7 +8,6 @@
  *)
 
 open! IStd
-
 module F = Format
 
 type t [@@deriving compare]
@@ -16,7 +15,5 @@ type t [@@deriving compare]
 val make : CallSite.t -> t
 
 val site : t -> CallSite.t
-
-val pp : F.formatter -> t -> unit
 
 module Set : PrettyPrintable.PPSet with type elt = t

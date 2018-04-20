@@ -7,9 +7,11 @@
 
 TESTS_DIR = ../../..
 
-ANALYZER = infer
-INFER_OPTIONS = --no-filtering --debug-exceptions
+ANALYZER = checkers
+INFER_OPTIONS = --biabduction-only --debug-exceptions
 INFERPRINT_OPTIONS = --issues-tests
 SOURCES = $(wildcard *.java)
 
 include $(TESTS_DIR)/javac.make
+
+infer-out/report.json: .inferconfig

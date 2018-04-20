@@ -8,38 +8,47 @@
 TESTS_DIR = ../..
 
 CMAKE_DIR = ../codetoanalyze/clang_compilation_database
-CMAKE_BUILD_DIR = $(CMAKE_DIR)/_build
+CMAKE_BUILD_DIR = $(CMAKE_DIR)/_build_infer
 
-ANALYZER = infer
+ANALYZER = checkers
 CLEAN_EXTRA = $(CMAKE_BUILD_DIR)
-INFER_OPTIONS = --cxx --report-custom-error --developer-mode --project-root $(CMAKE_DIR)
+INFER_OPTIONS = --report-custom-error --developer-mode --project-root $(CMAKE_DIR)
 SOURCES = $(CMAKE_DIR)/hello.cpp
 OBJECTS = $(CMAKE_BUILD_DIR)/compile_commands.json
 INFERPRINT_OPTIONS = --issues-tests
 
-include $(TESTS_DIR)/base.make
+include $(TESTS_DIR)/infer.make
 
 $(CMAKE_BUILD_DIR):
-	$(MKDIR_P) $@
+	$(QUIET)$(MKDIR_P) $@
 
 $(CMAKE_BUILD_DIR)/compile_commands.json: $(SOURCES) $(CMAKE_DIR)/CMakeLists.txt $(CMAKE_BUILD_DIR)
-	cd $(CMAKE_BUILD_DIR) && \
-	$(CMAKE) -DCMAKE_EXPORT_COMPILE_COMMANDS=1 ..
+	$(QUIET)cd $(CMAKE_BUILD_DIR) && \
+	$(call silent_on_success,Running cmake to generate Makefiles,\
+	$(CMAKE) -DCMAKE_EXPORT_COMPILE_COMMANDS=1 ..)
 
 infer-out/report.json:
-	# make this target empty - since this test defines issues.exp.test directly
+#	make this target empty - since this test defines issues.exp.test directly
 
-infer-out-with-index/report.json: $(CMAKE_BUILD_DIR)/compile_commands.json $(INFER_BIN) $(SOURCES)
-	$(call silent_on_success,\
-	  $(INFER_BIN) -a $(ANALYZER) $(INFER_OPTIONS) -o infer-out-with-index --changed-files-index $(CMAKE_DIR)/index.txt -- clang-compilation-database $<)
+infer-out-with-index/report.json: $(CMAKE_BUILD_DIR)/compile_commands.json $(CLANG_DEPS) $(SOURCES)
+	$(QUIET)$(call silent_on_success,Testing Clang compilation database with index integration,\
+	  $(INFER_BIN) -a $(ANALYZER) $(INFER_OPTIONS) -o $(@D) \
+	    --changed-files-index $(CMAKE_DIR)/index.txt --compilation-database $<)
 
-infer-out-no-index/report.json: $(CMAKE_BUILD_DIR)/compile_commands.json $(INFER_BIN) $(SOURCES)
-	$(call silent_on_success,\
-	  $(INFER_BIN) -a $(ANALYZER) $(INFER_OPTIONS) -o infer-out-no-index -- clang-compilation-database $<)
+infer-out-no-index/report.json: $(CMAKE_BUILD_DIR)/compile_commands.json $(CLANG_DEPS) $(SOURCES)
+	$(QUIET)$(call silent_on_success,Testing Clang compilation database integration,\
+	  $(INFER_BIN) -a $(ANALYZER) $(INFER_OPTIONS) -o $(@D) --compilation-database $<)
 
-issues.exp.test: infer-out-with-index/report.json infer-out-no-index/report.json
-	$(INFERPRINT_BIN) -q -a $(ANALYZER) $(INFERPRINT_OPTIONS) $@.with-index \
-		--from-json-report infer-out-with-index/report.json
-	$(INFERPRINT_BIN) -q -a $(ANALYZER) $(INFERPRINT_OPTIONS) $@.no-index \
-	  --from-json-report infer-out-no-index/report.json
-	cat $@.with-index $@.no-index > $@
+infer-out-reactive-capture/report.json: $(CMAKE_BUILD_DIR)/compile_commands.json $(CLANG_DEPS) $(SOURCES)
+	$(QUIET)$(call silent_on_success,Testing Clang compilation database reactive capture integration,\
+	  $(INFER_BIN) -a $(ANALYZER) $(INFER_OPTIONS) -o $(@D) --reactive-capture \
+	  --changed-files-index $(CMAKE_DIR)/index.txt --compilation-database $<)
+
+issues.exp.test: infer-out-with-index/report.json infer-out-no-index/report.json infer-out-reactive-capture/report.json
+	$(QUIET)$(INFER_BIN) report -q -a $(ANALYZER) $(INFERPRINT_OPTIONS) $@.with-index \
+	  -o infer-out-with-index --from-json-report infer-out-with-index/report.json
+	$(QUIET)$(INFER_BIN) report -q -a $(ANALYZER) $(INFERPRINT_OPTIONS) $@.no-index \
+	  -o infer-out-no-index --from-json-report infer-out-no-index/report.json
+	$(QUIET)$(INFER_BIN) report -q -a $(ANALYZER) $(INFERPRINT_OPTIONS) $@.reactive-capture \
+	  -o infer-out-reactive-capture --from-json-report infer-out-reactive-capture/report.json
+	$(QUIET)cat $@.with-index $@.no-index $@.reactive-capture > $@

@@ -12,36 +12,24 @@ open! IStd
 
 (** Support for Execution environments *)
 
-(** initial state, used to add cg's *)
-type initial
+type file_data
 
-(** execution environment: a global call graph, and map from procedure names to cfg and tenv *)
-type t
+type t = private
+  { proc_map: file_data Typ.Procname.Hash.t  (** map from procedure name to file data *)
+  ; file_map: file_data SourceFile.Hash.t  (** map from source files to file data *)
+  ; source_file: SourceFile.t  (** source file being analyzed *) }
 
-(** freeze the execution environment, so it can be queried *)
-val freeze : initial -> t
+val mk : SourceFile.t -> t
+(** Create an exe_env from a source file *)
 
-(** create a new execution environment *)
-val create : unit -> initial
-
-(** add call graph from the source dir in the spec db,
-    with relative tenv and cfg, to the execution environment *)
-val add_cg : initial -> DB.source_dir -> unit
-
-(** get the global call graph *)
-val get_cg : t -> Cg.t
-
-(** return the source file associated to the procedure *)
-val get_source : t -> Procname.t -> SourceFile.t option
-
+val get_tenv : t -> Typ.Procname.t -> Tenv.t
 (** return the type environment associated to the procedure *)
-val get_tenv : ?create:bool -> t -> Procname.t -> Tenv.t
 
+val get_cfg : t -> Typ.Procname.t -> Cfg.t option
 (** return the cfg associated to the procedure *)
-val get_cfg : t -> Procname.t -> Cfg.cfg option
 
+val get_proc_desc : t -> Typ.Procname.t -> Procdesc.t option
 (** return the proc desc associated to the procedure *)
-val get_proc_desc : t -> Procname.t -> Procdesc.t option
 
+val iter_files : (SourceFile.t -> Cfg.t -> unit) -> t -> unit
 (** [iter_files f exe_env] applies [f] to the source file and tenv and cfg for each file in [exe_env] *)
-val iter_files : (SourceFile.t -> Cfg.cfg -> unit) -> t -> unit

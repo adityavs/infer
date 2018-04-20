@@ -8,22 +8,25 @@
 ROOT_DIR = ../../..
 include $(ROOT_DIR)/Makefile.config
 
-OBJC_MODELS_FILE = $(SPECS_LIB_DIR)/objc_models
-OBJC_MODELS_SOURCES = $(shell find src/ -name "*.m" -or -name "*.c")
+OBJC_MODELS_SOURCES = $(shell find src/ -name "*.[chm]")
+INFER_RESULTS = out/report.json
 
-all: $(OBJC_MODELS_FILE)
+all: install
 
-$(OBJC_MODELS_FILE): $(OBJC_MODELS_SOURCES) $(CLANG_DEPS)
-# make clean in src/ in case $(CLANG_DEPS) have changed
-	$(MAKE) -C src clean
-	$(INFER_BIN) -o out/ --models-mode --no-failures-allowed -- $(MAKE) -C src
-	touch $(OBJC_MODELS_FILE)
+$(INFER_RESULTS): $(OBJC_MODELS_SOURCES) $(CLANG_DEPS_NO_MODELS) $(MAKEFILE_LIST)
+# make clean in src/ to recompile all the models
+	$(QUIET)$(call silent_on_success,Building Objective-C models,\
+	  $(INFER_BIN) -a checkers --biabduction-only -o $(@D) --models-mode -- $(MAKE) -C src clean all)
+
+$(OBJC_MODELS_FILE): $(INFER_RESULTS)
+	$(QUIET)$(INSTALL_DATA) $(dir $(INFER_RESULTS))/specs/*.specs $(SPECS_LIB_DIR)
+	$(QUIET)touch $@
 
 install: $(OBJC_MODELS_FILE)
-	$(INSTALL_DATA) -C out/specs/*.specs $(SPECS_LIB_DIR)
 
 clean:
-	@rm -f $(OBJC_MODELS_FILE)
-	$(MAKE) -C src clean
+	$(REMOVE) $(OBJC_MODELS_FILE)
+	$(REMOVE_DIR) $(dir $(INFER_RESULTS))
+	$(QUIET)$(MAKE) -C src clean
 
 .PHONY: all clean install

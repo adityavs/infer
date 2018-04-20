@@ -14,7 +14,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.StringReader;
-
+import java.util.Map;
+import java.util.HashMap;
 
 class LocalException extends IOException {
 }
@@ -65,6 +66,16 @@ class ResourceWithException implements Closeable {
   }
 }
 
+class ByteArrayOutputStreamWrapper extends ByteArrayOutputStream {
+}
+
+class ByteArrayInputStreamWrapper extends ByteArrayInputStream {
+
+  public ByteArrayInputStreamWrapper(byte[] arr) {
+    super(arr);
+  }
+}
+
 public class CloseableAsResourceExample {
 
   native static boolean star();
@@ -112,6 +123,11 @@ public class CloseableAsResourceExample {
 
   void noNeedToCloseByteArrayOutputStream() {
     ByteArrayOutputStream stream = new ByteArrayOutputStream(42);
+  }
+
+  void noCloseByteArrayWrappersOk(byte[] array) {
+    ByteArrayOutputStreamWrapper stream1 = new ByteArrayOutputStreamWrapper();
+    ByteArrayInputStreamWrapper stream2 = new ByteArrayInputStreamWrapper(array);
   }
 
   void noNeedToCloseByteArrayInputStream(byte[] array) {
@@ -171,6 +187,38 @@ public class CloseableAsResourceExample {
   void skippedVritualCallDoesNotCloseResourceOnReceiver() {
     SomeResource res = new SomeResource();
     res.foo(42);
+  }
+
+  Map returnsLocalMapContainingResourcesOk() {
+    HashMap<Integer, Closeable> map = new HashMap<>();
+    SomeResource res = new SomeResource();
+    Integer key = 42;
+    map.put(key, res);
+    return map;
+  }
+
+  void createsLocalMapContainingResourcesOk() {
+    HashMap<Integer, Closeable> map = new HashMap<>();
+    SomeResource res = new SomeResource();
+    Integer key = 42;
+    map.put(key, res);
+    map.clear();
+  }
+
+  HashMap<Integer, Closeable> resourceMap = new HashMap<>();
+
+  void fieldMapContainingResourcesOk() {
+    Integer key = 42;
+    SomeResource res = new SomeResource();
+    resourceMap.put(key, res);
+  }
+
+  // this case is not supported
+  void FN_notClearinglocalMapContainingResourcesBad() {
+    HashMap<Integer, Closeable> map = new HashMap<>();
+    SomeResource res = new SomeResource();
+    Integer key = 42;
+    map.put(key, res);
   }
 
 }

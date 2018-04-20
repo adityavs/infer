@@ -8,22 +8,21 @@
  *)
 
 open! IStd
-
 module F = Format
 
 (** Module to process clusters of procedures. *)
 
 (** a cluster is a file *)
-type t = DB.source_dir
+type t = SourceFile.t
 
 (** type stored in .cluster file: (n,cl) indicates cl is cluster n *)
 type serializer_t = int * t
 
-(** Load a cluster from a file *)
 val load_from_file : DB.filename -> serializer_t option
+(** Load a cluster from a file *)
 
-(** Print a cluster *)
 val pp_cluster : F.formatter -> serializer_t -> unit
+(** Print a cluster *)
 
-(** Print a cluster name *)
 val pp_cluster_name : F.formatter -> int -> unit
+(** Print a cluster name *)

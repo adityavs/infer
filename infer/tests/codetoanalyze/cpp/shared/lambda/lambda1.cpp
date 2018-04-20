@@ -26,3 +26,46 @@ int fooOK() {
   auto y = [](int i) { return i++; };
   return 5 / (4 - y(3));
 }
+
+int normal_capture() {
+  int x = 1;
+  int y = 2;
+  return [x, y]() { return x + y; }();
+}
+
+int capture_by_ref() {
+  int x = 0;
+  [&x]() { x++; }();
+  return x;
+}
+
+int init_capture1() {
+  return [i = 0]() { return i; }
+  ();
+}
+
+int init_capture2() {
+  int i = 0;
+  return [ a = i, b = 0, c = 3 ]() { return a + b + c; }
+  ();
+}
+
+class Capture {
+  void capture_this_explicit() {
+    auto lambda = [this]() { return this; };
+  }
+
+  void capture_star_this() {
+    auto lambda = [*this](){
+
+    };
+  }
+
+  void capture_this_with_equal() {
+    auto lambda = [=]() { return this; };
+  }
+
+  void capture_this_with_auto() {
+    auto lambda = [&]() { return this; };
+  }
+};

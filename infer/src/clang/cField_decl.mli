@@ -10,19 +10,15 @@
 open! IStd
 
 (** Utility module to retrieve fields of structs of classes *)
-open CFrontend_utils
 
-type field_type = Ident.fieldname * Typ.t * (Annot.t * bool) list
+type field_type = Typ.Fieldname.t * Typ.t * (Annot.t * bool) list
 
-val get_fields : Ast_utils.type_ptr_to_sil_type -> Tenv.t -> CContext.curr_class ->
-  Clang_ast_t.decl list -> field_type list
+val get_fields :
+  CAst_utils.qual_type_to_sil_type -> Tenv.t -> Typ.Name.t -> Clang_ast_t.decl list
+  -> field_type list
 
-val fields_superclass :
-  Tenv.t -> Clang_ast_t.obj_c_interface_decl_info -> Csu.class_kind -> field_type list
+val fields_superclass : Tenv.t -> Clang_ast_t.obj_c_interface_decl_info -> field_type list
 
-val build_sil_field : Ast_utils.type_ptr_to_sil_type -> Tenv.t -> Clang_ast_t.named_decl_info ->
-  Clang_ast_t.type_ptr -> Clang_ast_t.property_attribute list -> field_type
-
-val add_missing_fields : Tenv.t -> string -> Csu.class_kind -> field_type list -> unit
+val add_missing_fields : Tenv.t -> QualifiedCppName.t -> field_type list -> unit
 
 val modelled_field : Clang_ast_t.named_decl_info -> field_type list

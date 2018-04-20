@@ -33,6 +33,15 @@
   return sharedInstance;
 }
 
++ (int)block_attribute {
+  static dispatch_once_t once;
+  __block DispatchA* a = [DispatchA new];
+  dispatch_once(&once, ^{
+    a->_x = 10;
+  });
+  return a->_x;
+}
+
 + (instancetype)trans {
   static id sharedInstance;
   void (^dummy_block)() = ^{
@@ -48,7 +57,7 @@
     static_storage__ = ([self new]);
   };
   static dispatch_once_t once_token__;
-  _dispatch_once(&once_token__, initialization_block__);
+  dispatch_once(&once_token__, initialization_block__);
   return static_storage__;
 }
 
@@ -59,7 +68,7 @@
       static_storage__ = ([self new]);
     };
     static dispatch_once_t once_token__;
-    _dispatch_once(&once_token__, initialization_block__);
+    dispatch_once(&once_token__, initialization_block__);
     static_storage__;
   });
 }
